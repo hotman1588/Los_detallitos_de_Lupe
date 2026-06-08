@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@theme {
+  --color-sage-primary: #8C0428; /* Cereza Carmesí */
+  --color-sage-light: #F26B9C;   /* Rosa suave */
+  --color-terracotta: #F2AE2E;   /* Amarillo dorado / mostaza */
+  --color-earth-brown: #590212;  /* Vino profundo / Borgoña */
+  --color-peach-light: #FAFAFA;  /* Blanco cálido */
+  --color-natural-bg: #F2F2F2;   /* Gris claro / blanco roto cálido de la paleta */
+  --color-natural-text: #2B2122; /* Texto súper legible */
+  --color-olive-dark: #696617;   /* Verde oliva / dorado oliva */
+}
+
+body {
+  background-color: var(--color-natural-bg);
+  color: var(--color-natural-text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}

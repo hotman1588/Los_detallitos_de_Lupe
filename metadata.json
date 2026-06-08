@@ -1,0 +1,6 @@
+{
+  "name": "Los Detallitos de Lupe - Regalos y Floristería",
+  "description": "Tienda virtual de desayunos sorpresa, detalles y arreglos florales en Bogotá y Soacha con control de logística y panel de administración.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
