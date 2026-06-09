@@ -11,7 +11,11 @@ function cleanEnv(value: string | undefined): string {
     .trim();
 }
 
-const supabaseUrl = cleanEnv(import.meta.env.VITE_SUPABASE_URL);
+const rawSupabaseUrl = cleanEnv(import.meta.env.VITE_SUPABASE_URL);
+// Toma solo la URL base del proyecto (https://xxxxx.supabase.co) y descarta
+// cualquier ruta extra que se haya pegado por error, p. ej. "/rest/v1".
+const supabaseBaseMatch = rawSupabaseUrl.match(/^https:\/\/[a-z0-9-]+\.supabase\.co/i);
+const supabaseUrl = supabaseBaseMatch ? supabaseBaseMatch[0] : rawSupabaseUrl;
 const supabaseAnonKey = cleanEnv(import.meta.env.VITE_SUPABASE_ANON_KEY);
 
 const hasValidSupabaseUrl = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(supabaseUrl);
