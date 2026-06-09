@@ -459,23 +459,14 @@ export default function App() {
         {view === 'catalog' && (
           <div id="catalog-view" className="space-y-8 animate-fadeIn">
             {/* Brand hero banner */}
-            <section id="hero-banner" className="relative w-full overflow-hidden">
+            <section id="hero-banner" className="relative w-full overflow-hidden bg-peach-light">
               <img
                 src="/brand/banner.jpg"
                 alt="Los Detallitos de Lupe - Regalos y Floristería"
-                className="w-full h-[200px] sm:h-[280px] md:h-[360px] object-cover animate-kenBurns"
+                className="w-full h-[160px] sm:h-[220px] md:h-[300px] object-contain animate-fadeIn"
                 draggable={false}
                 onContextMenu={(e) => e.preventDefault()}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent"></div>
-              <div className="absolute bottom-0 left-0 right-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8">
-                <h2 className="text-white font-serif font-extrabold text-2xl sm:text-3xl md:text-4xl drop-shadow-lg tracking-tight animate-fadeInUp">
-                  Los Detallitos de Lupe
-                </h2>
-                <p className="text-white/90 text-sm sm:text-base font-medium mt-1 drop-shadow animate-fadeInUp" style={{ animationDelay: '0.15s' }}>
-                  Regalos, desayunos sorpresa y floristería hechos con amor 🌸
-                </p>
-              </div>
             </section>
 
             {/* Carousel container highlighting products of the month */}
