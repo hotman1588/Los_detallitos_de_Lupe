@@ -50,10 +50,24 @@ export default function AdminPanel({
   onUpdateOrderCoords
 }: AdminPanelProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userRole, setUserRole] = useState<'admin' | 'domiciliario' | null>(null);
+  const [userRole, setUserRole] = useState<SystemUser['role'] | null>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const canUseAdminDashboard = userRole === 'admin' || userRole === 'supervisor';
+  const canDeleteOrders = userRole === 'admin';
+  const canSimulateOrders = userRole === 'admin';
+  const canAssignAdminRole = userRole === 'admin';
+  const getRoleLabel = (role: SystemUser['role']) => {
+    if (role === 'admin') return '🚨 Administrador';
+    if (role === 'supervisor') return '🛡️ Supervisor';
+    return '🛵 Domiciliario';
+  };
+  const getRoleBadgeClass = (role: SystemUser['role']) => {
+    if (role === 'admin') return 'bg-rose-50 text-rose-700 border border-rose-100';
+    if (role === 'supervisor') return 'bg-amber-50 text-amber-800 border border-amber-100';
+    return 'bg-blue-50 text-blue-700 border border-blue-100';
+  };
 
   // New Orders audio-visual tracking states
   const prevOrdersCountRef = React.useRef(orders ? orders.length : 0);
@@ -108,13 +122,13 @@ export default function AdminPanel({
     if (orders && orders.length > prevOrdersCountRef.current) {
       // Isolate the newly added order
       const newOrder = orders.find(o => !orders.some(prevO => false)) || orders[0];
-      if (newOrder && isLoggedIn && userRole === 'admin') {
+      if (newOrder && isLoggedIn && canUseAdminDashboard) {
         setNewOrderAlert(newOrder);
         playNotificationTone();
       }
     }
     prevOrdersCountRef.current = orders ? orders.length : 0;
-  }, [orders, isLoggedIn, userRole]);
+  }, [orders, isLoggedIn, canUseAdminDashboard]);
 
   // Domiciliario Proof of Delivery states
   const [uploadingPhotos, setUploadingPhotos] = useState<Record<string, string>>({}); // orderId -> Base64
@@ -127,19 +141,27 @@ export default function AdminPanel({
 
   // Users State persistent in localStorage / Supabase
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
+  const ADMIN_DEFAULT_PASSWORD = 'Allus2013.**';
 
   React.useEffect(() => {
     async function loadUsers() {
       if (isSupabaseConfigured) {
         const dbUsers = await getSystemUsers();
         if (dbUsers && dbUsers.length > 0) {
-          setSystemUsers(dbUsers);
+          const normalizedUsers = dbUsers.map(u =>
+            u.username === 'admin' ? { ...u, password: ADMIN_DEFAULT_PASSWORD } : u
+          );
+          setSystemUsers(normalizedUsers);
+          const adminUser = normalizedUsers.find(u => u.username === 'admin');
+          if (adminUser && dbUsers.find(u => u.username === 'admin')?.password !== ADMIN_DEFAULT_PASSWORD) {
+            await upsertSystemUser(adminUser);
+          }
         } else {
           const defaults: SystemUser[] = [
             {
               id: '1016016370',
               username: 'admin',
-              password: '1016016370',
+              password: ADMIN_DEFAULT_PASSWORD,
               name: 'Administrador Principal',
               phone: '3138005702',
               email: 'admin@detallitoslupe.com',
@@ -164,7 +186,12 @@ export default function AdminPanel({
         const saved = localStorage.getItem('dulce_amanecer_system_users');
         if (saved) {
           try {
-            setSystemUsers(JSON.parse(saved));
+            const savedUsers = JSON.parse(saved) as SystemUser[];
+            const normalizedUsers = savedUsers.map(u =>
+              u.username === 'admin' ? { ...u, password: ADMIN_DEFAULT_PASSWORD } : u
+            );
+            setSystemUsers(normalizedUsers);
+            localStorage.setItem('dulce_amanecer_system_users', JSON.stringify(normalizedUsers));
             return;
           } catch (e) {}
         }
@@ -172,7 +199,7 @@ export default function AdminPanel({
           {
             id: '1016016370',
             username: 'admin',
-            password: '1016016370',
+            password: ADMIN_DEFAULT_PASSWORD,
             name: 'Administrador Principal',
             phone: '3138005702',
             email: 'admin@detallitoslupe.com',
@@ -227,7 +254,7 @@ export default function AdminPanel({
   const [newUserName, setNewUserName] = useState('');
   const [newUserPhone, setNewUserPhone] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserRole, setNewUserRole] = useState<'admin' | 'domiciliario'>('domiciliario');
+  const [newUserRole, setNewUserRole] = useState<SystemUser['role']>('domiciliario');
 
   // Form states for changing a user password
   const [changingPasswordUser, setChangingPasswordUser] = useState<SystemUser | null>(null);
@@ -265,10 +292,10 @@ export default function AdminPanel({
         setAdminIdCounter(String(counter));
       }
     }
-    if (isLoggedIn && userRole === 'admin') {
+    if (isLoggedIn && canUseAdminDashboard) {
       loadConfig();
     }
-  }, [isLoggedIn, userRole]);
+  }, [isLoggedIn, canUseAdminDashboard]);
 
   const [showIdConfigMsg, setShowIdConfigMsg] = useState(false);
   const [showIdConfigPanel, setShowIdConfigPanel] = useState(false);
@@ -496,8 +523,13 @@ CREATE TABLE IF NOT EXISTS system_users (
     name VARCHAR(150) NOT NULL,
     phone VARCHAR(50),
     email VARCHAR(150),
-    role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'domiciliario'))
+    role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'supervisor', 'domiciliario'))
 );
+
+ALTER TABLE system_users DROP CONSTRAINT IF EXISTS system_users_role_check;
+ALTER TABLE system_users
+    ADD CONSTRAINT system_users_role_check
+    CHECK (role IN ('admin', 'supervisor', 'domiciliario'));
 
 ALTER TABLE system_users ENABLE ROW LEVEL SECURITY;
 
@@ -666,6 +698,11 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
       return;
     }
     const usernameVal = newUserUsername.trim() || newUserCedula.trim();
+    if (!canAssignAdminRole && newUserRole === 'admin') {
+      alert("El rol supervisor no puede crear ni asignar usuarios con rol administrador.");
+      setNewUserRole('supervisor');
+      return;
+    }
 
     if (editingUser) {
       // Check duplicate
@@ -1790,6 +1827,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
             <SlidersHorizontal size={14} />
             Configurar ID de Venta
           </button>
+          {canDeleteOrders && (
           <button
             onClick={() => {
               setBulkDeleteConfirmationStep(1);
@@ -1800,7 +1838,8 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
             <Trash2 size={14} />
             Eliminar Órdenes Totales
           </button>
-          {onAddOrder && (
+          )}
+          {onAddOrder && canSimulateOrders && (
             <button
               onClick={() => {
                 const randomIdNum = Math.floor(10000 + Math.random() * 90000);
@@ -2936,13 +2975,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
                         </div>
                       </td>
                       <td className="py-4 px-5">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
-                          user.role === 'admin' 
-                            ? 'bg-rose-50 text-rose-700 border border-rose-100' 
-                            : 'bg-blue-50 text-blue-700 border border-blue-100'
-                        }`}>
-                          {user.role === 'admin' ? '🚨 Administrador' : '🛵 Domiciliario'}
-                        </span>
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${getRoleBadgeClass(user.role)}`}>{getRoleLabel(user.role)}</span>
                       </td>
                       <td className="py-4 px-5">
                         <div className="space-y-0.5 text-slate-600">
@@ -2954,6 +2987,10 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => {
+                              if (!canAssignAdminRole && user.role === 'admin') {
+                                alert("El rol supervisor no puede modificar usuarios administradores.");
+                                return;
+                              }
                               setEditingUser(user);
                               setNewUserCedula(user.id);
                               setNewUserUsername(user.username);
@@ -2972,6 +3009,10 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
 
                           <button
                             onClick={() => {
+                              if (!canAssignAdminRole && user.role === 'admin') {
+                                alert("El rol supervisor no puede cambiar la clave de un administrador.");
+                                return;
+                              }
                               setChangingPasswordUser(user);
                               setNewPasswordValue(user.password);
                             }}
@@ -2982,7 +3023,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
                           </button>
                           
                           {/* Protect critical or current accounts from elimination */}
-                          {user.username !== 'admin' && user.id !== currentUser?.id && (
+                          {user.username !== 'admin' && user.id !== currentUser?.id && (canAssignAdminRole || user.role !== 'admin') && (
                             <button
                               onClick={() => {
                                 setDeletingUser(user);
@@ -3384,7 +3425,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
       )}
 
       {/* MODAL 1: CONFIRMACIÓN DE ELIMINACIÓN DE TODAS LAS ÓRDENES */}
-      {showBulkDeleteConfirm && (
+      {showBulkDeleteConfirm && canDeleteOrders && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans">
           <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-rose-100 animate-scaleUp text-slate-800">
             {/* Header */}
@@ -3734,7 +3775,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
 
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Asignación de Rol *</label>
-                  <div className="grid grid-cols-2 gap-3 mt-1">
+                  <div className={`grid ${canAssignAdminRole ? 'grid-cols-3' : 'grid-cols-2'} gap-3 mt-1`}>
                     <label className={`border rounded-xl p-3 flex flex-col items-center gap-1 cursor-pointer transition ${
                       newUserRole === 'domiciliario' 
                         ? 'border-blue-600 bg-blue-50 text-blue-900 font-extrabold' 
@@ -3750,6 +3791,23 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
                       <span>🛵 Domiciliario</span>
                       <span className="text-[9px] text-slate-400 font-normal">Reparto Autónomo</span>
                     </label>
+                    <label className={`border rounded-xl p-3 flex flex-col items-center gap-1 cursor-pointer transition ${
+                      newUserRole === 'supervisor' 
+                        ? 'border-amber-600 bg-amber-50 text-amber-900 font-extrabold' 
+                        : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="newUserRole"
+                        checked={newUserRole === 'supervisor'}
+                        onChange={() => setNewUserRole('supervisor')}
+                        className="sr-only"
+                      />
+                      <span>Supervisor</span>
+                      <span className="text-[9px] text-slate-400 font-normal">Sin eliminar ordenes</span>
+                    </label>
+
+                    {canAssignAdminRole && (
 
                     <label className={`border rounded-xl p-3 flex flex-col items-center gap-1 cursor-pointer transition ${
                       newUserRole === 'admin' 
@@ -3766,6 +3824,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
                       <span>🚨 Administrador</span>
                       <span className="text-[9px] text-slate-400 font-normal">Backoffice Completo</span>
                     </label>
+                    )}
                   </div>
                 </div>
               </div>
@@ -3805,7 +3864,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
               <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-150 space-y-1">
                 <span className="text-[10px] font-bold text-slate-450 uppercase block select-none">Usuario Seleccionado</span>
                 <p className="text-slate-800 font-bold">{changingPasswordUser.name}</p>
-                <p className="text-[10px] font-mono text-slate-500">ID/Cédula: {changingPasswordUser.id} | Rol: {changingPasswordUser.role === 'admin' ? 'Administrador' : 'Domiciliario'}</p>
+                <p className="text-[10px] font-mono text-slate-500">ID/Cédula: {changingPasswordUser.id} | Rol: {getRoleLabel(changingPasswordUser.role)}</p>
               </div>
 
               <div>
@@ -3842,3 +3901,8 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
     </div>
   );
 }
+
+
+
+
+

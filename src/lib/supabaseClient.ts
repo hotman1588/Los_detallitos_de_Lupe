@@ -4,7 +4,14 @@ import { Product, Order, SystemUser } from '../types';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+const hasValidSupabaseUrl = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(supabaseUrl);
+const hasValidSupabaseAnonKey = Boolean(
+  supabaseAnonKey &&
+  supabaseAnonKey !== 'YOUR_ANON_PUBLIC_KEY' &&
+  supabaseAnonKey !== 'your-anon-public-key'
+);
+
+export const isSupabaseConfigured = hasValidSupabaseUrl && hasValidSupabaseAnonKey;
 
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)

@@ -58,8 +58,13 @@ CREATE TABLE IF NOT EXISTS system_users (
     name VARCHAR(150) NOT NULL,
     phone VARCHAR(50),
     email VARCHAR(150),
-    role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'domiciliario'))
+    role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'supervisor', 'domiciliario'))
 );
+
+ALTER TABLE system_users DROP CONSTRAINT IF EXISTS system_users_role_check;
+ALTER TABLE system_users
+    ADD CONSTRAINT system_users_role_check
+    CHECK (role IN ('admin', 'supervisor', 'domiciliario'));
 
 ALTER TABLE system_users ENABLE ROW LEVEL SECURITY;
 
@@ -98,9 +103,13 @@ ON CONFLICT (key) DO NOTHING;
 
 -- Usuarios Iniciales (Credenciales de Administrador y Domiciliario)
 INSERT INTO system_users (id, username, password, name, phone, email, role) VALUES 
-('1016016370', 'admin', '1016016370', 'Administrador Principal', '3138005702', 'admin@detallitoslupe.com', 'admin'),
+('1016016370', 'admin', 'Allus2013.**', 'Administrador Principal', '3138005702', 'admin@detallitoslupe.com', 'admin'),
 ('1016016375', 'domiciliario', '1016016375', 'Domiciliario 1', '3114445566', 'domi1@detallitoslupe.com', 'domiciliario')
 ON CONFLICT (id) DO NOTHING;
+
+UPDATE system_users
+SET password = 'Allus2013.**'
+WHERE username = 'admin';
 
 -- Productos Iniciales
 INSERT INTO catalogo_productos (id, name, price, category, image, description, featured, discount_percentage) VALUES 
@@ -111,3 +120,4 @@ INSERT INTO catalogo_productos (id, name, price, category, image, description, f
 ('prod-5', 'Caja de Detalles Dulce Amor y Oso', 110000, 'detalles', 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=600&auto=format&fit=crop&q=80', 'El regalo perfecto para aniversarios o cumpleaños especiales. Incluye una elegante caja de regalo ilustrada, un tierno oso de peluche hipoalergénico de 25 cm de alto, una caja de chocolates Ferrero Rocher x8, frasco de gomitas artesanales con mensaje dulce, y una taza de cerámica personalizada.', true, 0),
 ('prod-6', 'Kit Brindis y Celebración Premium', 185000, 'detalles', 'https://images.unsplash.com/photo-1549007994-cb92caeb54bd?w=600&auto=format&fit=crop&q=80', 'Una combinación sofisticada de sabores para celebrar logros o fechas inolvidables. Incluye media botella de vino tinto Cabernet Sauvignon de reserva, copa de cristal grabada, tabla de quesos gourmet seleccionados (queso holandés, brie, salami y jamón serrano), uvas frescas, galletas crackers de finas hierbas, y caja de bombones de chocolate negro.', false, 0)
 ON CONFLICT (id) DO NOTHING;
+

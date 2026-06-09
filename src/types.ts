@@ -79,7 +79,7 @@ export interface SystemUser {
   name: string; // Nombre completo
   phone: string; // Número de contacto
   email: string; // Correo electrónico
-  role: 'admin' | 'domiciliario'; // Rol asignado
+  role: 'admin' | 'supervisor' | 'domiciliario'; // Rol asignado
 }
 
 export interface AdminUser {

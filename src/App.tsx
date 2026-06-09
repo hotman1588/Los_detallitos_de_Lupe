@@ -371,9 +371,12 @@ export default function App() {
           
           {/* Logo Brand */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setView('catalog')}>
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sage-primary to-sage-light flex items-center justify-center text-white font-serif font-bold shadow-md">
-              DL
-            </div>
+            <img
+              src="/brand/logo.jpg"
+              alt="Los Detallitos de Lupe"
+              className="w-12 h-12 rounded-2xl object-cover shadow-md ring-1 ring-sage-light/30"
+              draggable={false}
+            />
             <div>
               <h1 className="text-xl font-bold text-slate-800 leading-tight font-sans tracking-tight">
                 Los Detallitos de Lupe
@@ -457,6 +460,26 @@ export default function App() {
         {/* VIEW: CATALOGUE & CAROUSEL */}
         {view === 'catalog' && (
           <div id="catalog-view" className="space-y-8 animate-fadeIn">
+            {/* Brand hero banner */}
+            <section id="hero-banner" className="relative w-full overflow-hidden">
+              <img
+                src="/brand/banner.jpg"
+                alt="Los Detallitos de Lupe - Regalos y Floristería"
+                className="w-full h-[200px] sm:h-[280px] md:h-[360px] object-cover"
+                draggable={false}
+                onContextMenu={(e) => e.preventDefault()}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent"></div>
+              <div className="absolute bottom-0 left-0 right-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8">
+                <h2 className="text-white font-serif font-extrabold text-2xl sm:text-3xl md:text-4xl drop-shadow-lg tracking-tight">
+                  Los Detallitos de Lupe
+                </h2>
+                <p className="text-white/90 text-sm sm:text-base font-medium mt-1 drop-shadow">
+                  Regalos, desayunos sorpresa y floristería hechos con amor 🌸
+                </p>
+              </div>
+            </section>
+
             {/* Carousel container highlighting products of the month */}
             <ProductCarousel
               products={products}
@@ -957,7 +980,6 @@ export default function App() {
           </p>
           <div className="text-[10px] text-slate-600 flex justify-center gap-4">
             <span>Usuario Backoffice: <strong>admin</strong></span>
-            <span>Clave Backoffice: <strong>1016016370</strong></span>
           </div>
           <p className="text-[10px] text-slate-600">&copy; {new Date().getFullYear()} Los Detallitos de Lupe. Todos los derechos reservados. Desarrollado con los más altos estándares de UX/UI.</p>
         </div>
