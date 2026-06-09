@@ -1,8 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 import { Product, Order, SystemUser } from '../types';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Limpia el valor de variables de entorno: quita espacios, saltos de línea,
+// comillas envolventes y barras finales que suelen colarse al pegar en Vercel.
+function cleanEnv(value: string | undefined): string {
+  return (value || '')
+    .trim()
+    .replace(/^['"]+|['"]+$/g, '') // comillas al inicio/fin
+    .replace(/\/+$/, '')           // barra(s) al final
+    .trim();
+}
+
+const supabaseUrl = cleanEnv(import.meta.env.VITE_SUPABASE_URL);
+const supabaseAnonKey = cleanEnv(import.meta.env.VITE_SUPABASE_ANON_KEY);
 
 const hasValidSupabaseUrl = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(supabaseUrl);
 const hasValidSupabaseAnonKey = Boolean(
@@ -10,6 +20,16 @@ const hasValidSupabaseAnonKey = Boolean(
   supabaseAnonKey !== 'YOUR_ANON_PUBLIC_KEY' &&
   supabaseAnonKey !== 'your-anon-public-key'
 );
+
+// Diagnóstico en consola del navegador (no expone la clave completa).
+if (typeof window !== 'undefined') {
+  console.info(
+    '[Supabase] configurado:', hasValidSupabaseUrl && hasValidSupabaseAnonKey,
+    '| URL detectada:', supabaseUrl || '(vacía)',
+    '| URL válida:', hasValidSupabaseUrl,
+    '| ANON key presente:', hasValidSupabaseAnonKey
+  );
+}
 
 export const isSupabaseConfigured = hasValidSupabaseUrl && hasValidSupabaseAnonKey;
 
