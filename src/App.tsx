@@ -374,7 +374,7 @@ export default function App() {
             <img
               src="/brand/logo.jpg"
               alt="Los Detallitos de Lupe"
-              className="w-12 h-12 rounded-2xl object-cover shadow-md ring-1 ring-sage-light/30"
+              className="w-12 h-12 rounded-2xl object-cover shadow-md ring-1 ring-sage-light/30 transition-transform duration-300 hover:scale-110 hover:rotate-3"
               draggable={false}
             />
             <div>
@@ -465,16 +465,16 @@ export default function App() {
               <img
                 src="/brand/banner.jpg"
                 alt="Los Detallitos de Lupe - Regalos y Floristería"
-                className="w-full h-[200px] sm:h-[280px] md:h-[360px] object-cover"
+                className="w-full h-[200px] sm:h-[280px] md:h-[360px] object-cover animate-kenBurns"
                 draggable={false}
                 onContextMenu={(e) => e.preventDefault()}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent"></div>
               <div className="absolute bottom-0 left-0 right-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8">
-                <h2 className="text-white font-serif font-extrabold text-2xl sm:text-3xl md:text-4xl drop-shadow-lg tracking-tight">
+                <h2 className="text-white font-serif font-extrabold text-2xl sm:text-3xl md:text-4xl drop-shadow-lg tracking-tight animate-fadeInUp">
                   Los Detallitos de Lupe
                 </h2>
-                <p className="text-white/90 text-sm sm:text-base font-medium mt-1 drop-shadow">
+                <p className="text-white/90 text-sm sm:text-base font-medium mt-1 drop-shadow animate-fadeInUp" style={{ animationDelay: '0.15s' }}>
                   Regalos, desayunos sorpresa y floristería hechos con amor 🌸
                 </p>
               </div>
@@ -578,11 +578,12 @@ export default function App() {
                 </div>
               ) : (
                 <div id="product-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-                  {filteredProducts.map((p) => (
+                  {filteredProducts.map((p, idx) => (
                     <article
                       key={p.id}
                       id={`product-card-${p.id}`}
-                      className="bg-white rounded-3xl border border-[#E6E6E6] overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between group"
+                      style={{ animationDelay: `${Math.min(idx * 60, 480)}ms` }}
+                      className="bg-white rounded-3xl border border-[#E6E6E6] overflow-hidden shadow-xs hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between group animate-fadeInUp will-change-transform"
                     >
                       <div className="relative h-[220px] overflow-hidden bg-slate-100">
                         <img
@@ -643,7 +644,7 @@ export default function App() {
                             <button
                               id={`btn-add-cart-${p.id}`}
                               onClick={() => handleAddToCart(p)}
-                              className="bg-sage-primary hover:bg-[#5C614E] text-white font-semibold text-xs px-3 py-2 rounded-full flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                              className="bg-sage-primary hover:bg-[#5C614E] text-white font-semibold text-xs px-3 py-2 rounded-full flex items-center gap-1.5 transition-all duration-200 shadow-xs cursor-pointer hover:scale-105 active:scale-95"
                               title="Añadir a mi pedido"
                             >
                               <ShoppingBag size={12} />
@@ -978,10 +979,7 @@ export default function App() {
           <p className="max-w-lg mx-auto leading-relaxed text-slate-500 text-[11px]">
             Operando bajo lineamientos logísticos estrictos de 3 días de anticipación y DIVIPOLA DANE oficial para entregas sin contratiempos en las comunas de Soacha y localidades de Bogotá D.C., Colombia.
           </p>
-          <div className="text-[10px] text-slate-600 flex justify-center gap-4">
-            <span>Usuario Backoffice: <strong>admin</strong></span>
-          </div>
-          <p className="text-[10px] text-slate-600">&copy; {new Date().getFullYear()} Los Detallitos de Lupe. Todos los derechos reservados. Desarrollado con los más altos estándares de UX/UI.</p>
+          <p className="text-[10px] text-slate-600">&copy; {new Date().getFullYear()} Los Detallitos de Lupe. Todos los derechos reservados.</p>
         </div>
       </footer>
     </div>

@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { Product } from '../types';
 import { ChevronLeft, ChevronRight, ShoppingBag, Eye } from 'lucide-react';
 import { getProductDiscount, getProductEffectivePrice } from '../lib/promoUtils';
@@ -79,20 +80,30 @@ export default function ProductCarousel({
           <div className="grid grid-cols-1 md:grid-cols-12 md:h-full">
             {/* Image section */}
             <div className="md:col-span-5 h-[200px] sm:h-[240px] md:h-full relative overflow-hidden group">
-              <img
+              <motion.img
+                key={activeProduct.id}
                 src={activeProduct.image}
                 alt={activeProduct.name}
-                className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 will-change-transform"
                 referrerPolicy="no-referrer"
+                initial={{ opacity: 0, scale: 1.06 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:to-white/10"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:to-white/10 pointer-events-none"></div>
               <span className="absolute top-4 left-4 bg-terracotta text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md z-15 uppercase tracking-wider">
                 Destacado Especial
               </span>
             </div>
 
             {/* Product description / CTAs */}
-            <div className="md:col-span-7 p-6 sm:p-10 flex flex-col justify-between bg-white relative z-10">
+            <motion.div
+              key={`info-${activeProduct.id}`}
+              className="md:col-span-7 p-6 sm:p-10 flex flex-col justify-between bg-white relative z-10"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1], delay: 0.08 }}
+            >
               <div>
                 <span className="text-[11px] uppercase font-bold tracking-widest text-earth-brown bg-peach-light px-2.5 py-1 rounded-md self-start inline-block mb-3">
                   {activeProduct.category}
@@ -142,7 +153,7 @@ export default function ProductCarousel({
                   Ver Detalles
                 </button>
               </div>
-            </div>
+            </motion.div>
           </div>
 
           {/* Dots navigation indicator */}
