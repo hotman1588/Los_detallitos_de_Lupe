@@ -49,8 +49,20 @@ export default function AdminPanel({
   onAddOrder,
   onUpdateOrderCoords
 }: AdminPanelProps) {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userRole, setUserRole] = useState<SystemUser['role'] | null>(null);
+  // Sesión persistida: mantiene el login del backoffice al recargar la página.
+  // Solo se borra al presionar "Cerrar Sesión".
+  const SESSION_KEY = 'dulce_amanecer_admin_session';
+  const savedSession: SystemUser | null = (() => {
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      return raw ? (JSON.parse(raw) as SystemUser) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const [isLoggedIn, setIsLoggedIn] = useState(!!savedSession);
+  const [userRole, setUserRole] = useState<SystemUser['role'] | null>(savedSession?.role ?? null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -231,7 +243,7 @@ export default function AdminPanel({
     }
   };
 
-  const [currentUser, setCurrentUser] = useState<SystemUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<SystemUser | null>(savedSession);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<'orders' | 'inventory' | 'users'>('orders');
@@ -657,6 +669,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
       setUserRole(foundUser.role);
       setCurrentUser(foundUser);
       setLoginError('');
+      try { localStorage.setItem(SESSION_KEY, JSON.stringify(foundUser)); } catch {}
     } else {
       setLoginError('Usuario o contraseña incorrectos.');
     }
@@ -674,6 +687,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
     setCurrentUser(null);
     setUsername('');
     setPassword('');
+    try { localStorage.removeItem(SESSION_KEY); } catch {}
     if (liveStream) {
       stopCameraStreamForced(liveStream);
       setLiveStream(null);
@@ -3052,16 +3066,16 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
 
       {/* CRUD Product Modal (Create & Update) */}
       {showProductModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-lg w-full border border-slate-100">
-            <div className="bg-sage-primary text-white px-6 py-4 flex justify-between items-center">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn overflow-y-auto">
+          <div className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-lg w-full border border-slate-100 max-h-[90vh] flex flex-col my-auto">
+            <div className="bg-sage-primary text-white px-6 py-4 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-base font-sans">
                 {editingProduct ? 'Editar Producto del Catálogo' : 'Agregar Nuevo Producto'}
               </h3>
               <button onClick={() => setShowProductModal(false)} className="text-white/80 hover:text-white font-bold text-sm cursor-pointer">✖</button>
             </div>
 
-            <form onSubmit={handleSaveProduct} className="p-6 space-y-4 text-xs font-sans">
+            <form onSubmit={handleSaveProduct} className="p-6 space-y-4 text-xs font-sans overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="block font-bold text-slate-600 mb-1">Nombre del Producto *</label>
@@ -3227,7 +3241,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
                 </div>
               </div>
 
-              <div className="pt-4 flex justify-end gap-2 border-t border-slate-100">
+              <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-4 bg-white/95 backdrop-blur-sm border-t border-slate-100 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowProductModal(false)}
