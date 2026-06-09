@@ -3066,8 +3066,8 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
 
       {/* CRUD Product Modal (Create & Update) */}
       {showProductModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn overflow-y-auto">
-          <div className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-lg w-full border border-slate-100 max-h-[90vh] flex flex-col my-auto">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-lg w-full border border-slate-100 max-h-[90vh] flex flex-col">
             <div className="bg-sage-primary text-white px-6 py-4 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-base font-sans">
                 {editingProduct ? 'Editar Producto del Catálogo' : 'Agregar Nuevo Producto'}
@@ -3075,7 +3075,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
               <button onClick={() => setShowProductModal(false)} className="text-white/80 hover:text-white font-bold text-sm cursor-pointer">✖</button>
             </div>
 
-            <form onSubmit={handleSaveProduct} className="p-6 space-y-4 text-xs font-sans overflow-y-auto">
+            <form onSubmit={handleSaveProduct} className="p-6 space-y-4 text-xs font-sans flex-1 min-h-0 overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <label className="block font-bold text-slate-600 mb-1">Nombre del Producto *</label>
