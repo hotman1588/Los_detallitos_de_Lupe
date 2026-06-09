@@ -12,7 +12,7 @@ import CheckoutFlow from './components/CheckoutFlow';
 import AdminPanel from './components/AdminPanel';
 import OrderTracker from './components/OrderTracker';
 import { getProductDiscount, getProductEffectivePrice, safeSaveOrders } from './lib/promoUtils';
-import { ShoppingCart, Search, Eye, ShoppingBag, ListFilter, CheckCircle, Shield, Heart, Truck, Gift, MessageCircle } from 'lucide-react';
+import { ShoppingCart, Search, Eye, ShoppingBag, ListFilter, CheckCircle, Shield, Heart, Truck, Gift, MessageCircle, Flower2 } from 'lucide-react';
 import {
   isSupabaseConfigured,
   getProducts,
@@ -371,12 +371,10 @@ export default function App() {
           
           {/* Logo Brand */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setView('catalog')}>
-            <img
-              src="/brand/logo.jpg"
-              alt="Los Detallitos de Lupe"
-              className="w-12 h-12 rounded-2xl object-cover shadow-md ring-1 ring-sage-light/30 transition-transform duration-300 hover:scale-110 hover:rotate-3"
-              draggable={false}
-            />
+            <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-tr from-sage-primary to-sage-light flex items-center justify-center shadow-md ring-1 ring-sage-light/30 transition-transform duration-300 hover:scale-110 hover:rotate-3">
+              <Flower2 className="text-white" size={24} strokeWidth={2.2} />
+              <Gift className="text-white/90 absolute -bottom-1 -right-1 bg-terracotta rounded-full p-0.5" size={16} strokeWidth={2.4} />
+            </div>
             <div>
               <h1 className="text-xl font-bold text-slate-800 leading-tight font-sans tracking-tight">
                 Los Detallitos de Lupe
