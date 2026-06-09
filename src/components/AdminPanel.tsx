@@ -3229,19 +3229,19 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
                   />
                 </div>
 
-                <div className="col-span-2 flex items-center gap-2">
+                <div className="col-span-2 flex items-center gap-2 mb-2 pb-2">
                   <input
                     type="checkbox"
                     id="checkbox-featured"
                     checked={prodFeatured}
                     onChange={(e) => setProdFeatured(e.target.checked)}
-                    className="w-4 h-4 text-sage-primary focus:ring-sage-primary border-slate-300 rounded-sm"
+                    className="w-4 h-4 text-sage-primary focus:ring-sage-primary border-slate-300 rounded-sm shrink-0"
                   />
                   <label htmlFor="checkbox-featured" className="font-bold text-slate-700">Destacar en el carrusel de la página de inicio</label>
                 </div>
               </div>
 
-              <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-4 bg-white/95 backdrop-blur-sm border-t border-slate-100 flex justify-end gap-2">
+              <div className="sticky bottom-0 -mx-6 -mb-6 px-6 py-4 bg-white border-t border-slate-100 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowProductModal(false)}
