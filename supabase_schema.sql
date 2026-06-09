@@ -18,9 +18,11 @@ CREATE TABLE IF NOT EXISTS catalogo_productos (
 ALTER TABLE catalogo_productos ENABLE ROW LEVEL SECURITY;
 
 -- Crear políticas para permitir lectura anónima y gestión total
+DROP POLICY IF EXISTS "Permitir lectura publica de productos" ON catalogo_productos;
 CREATE POLICY "Permitir lectura publica de productos" ON catalogo_productos
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Permitir gestion total anonima de productos" ON catalogo_productos;
 CREATE POLICY "Permitir gestion total anonima de productos" ON catalogo_productos
     FOR ALL USING (true) WITH CHECK (true);
 
@@ -44,9 +46,11 @@ CREATE TABLE IF NOT EXISTS pedidos (
 ALTER TABLE pedidos ENABLE ROW LEVEL SECURITY;
 
 -- Crear políticas de pedidos
+DROP POLICY IF EXISTS "Permitir lectura de pedidos anonima" ON pedidos;
 CREATE POLICY "Permitir lectura de pedidos anonima" ON pedidos
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Permitir creacion y modificacion anonima de pedidos" ON pedidos;
 CREATE POLICY "Permitir creacion y modificacion anonima de pedidos" ON pedidos
     FOR ALL USING (true) WITH CHECK (true);
 
@@ -69,9 +73,11 @@ ALTER TABLE system_users
 ALTER TABLE system_users ENABLE ROW LEVEL SECURITY;
 
 -- Crear políticas de usuarios
+DROP POLICY IF EXISTS "Permitir lectura de usuarios para autenticacion" ON system_users;
 CREATE POLICY "Permitir lectura de usuarios para autenticacion" ON system_users
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Permitir gestion de usuarios anonima" ON system_users;
 CREATE POLICY "Permitir gestion de usuarios anonima" ON system_users
     FOR ALL USING (true) WITH CHECK (true);
 
@@ -84,9 +90,11 @@ CREATE TABLE IF NOT EXISTS configuracion (
 ALTER TABLE configuracion ENABLE ROW LEVEL SECURITY;
 
 -- Crear políticas de configuración
+DROP POLICY IF EXISTS "Permitir lectura de configuraciones" ON configuracion;
 CREATE POLICY "Permitir lectura de configuraciones" ON configuracion
     FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Permitir actualizacion de configuraciones" ON configuracion;
 CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
     FOR ALL USING (true) WITH CHECK (true);
 
@@ -106,10 +114,8 @@ INSERT INTO system_users (id, username, password, name, phone, email, role) VALU
 ('1016016370', 'admin', 'Allus2013.**', 'Administrador Principal', '3138005702', 'admin@detallitoslupe.com', 'admin'),
 ('1016016375', 'domiciliario', '1016016375', 'Domiciliario 1', '3114445566', 'domi1@detallitoslupe.com', 'domiciliario')
 ON CONFLICT (id) DO NOTHING;
-
-UPDATE system_users
-SET password = 'Allus2013.**'
-WHERE username = 'admin';
+-- Nota: la contraseña de admin NO se sobrescribe en re-ejecuciones; se respeta
+-- la que esté guardada para permitir cambiarla desde el backoffice.
 
 -- Productos Iniciales
 INSERT INTO catalogo_productos (id, name, price, category, image, description, featured, discount_percentage) VALUES 

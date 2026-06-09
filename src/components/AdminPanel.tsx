@@ -148,14 +148,8 @@ export default function AdminPanel({
       if (isSupabaseConfigured) {
         const dbUsers = await getSystemUsers();
         if (dbUsers && dbUsers.length > 0) {
-          const normalizedUsers = dbUsers.map(u =>
-            u.username === 'admin' ? { ...u, password: ADMIN_DEFAULT_PASSWORD } : u
-          );
-          setSystemUsers(normalizedUsers);
-          const adminUser = normalizedUsers.find(u => u.username === 'admin');
-          if (adminUser && dbUsers.find(u => u.username === 'admin')?.password !== ADMIN_DEFAULT_PASSWORD) {
-            await upsertSystemUser(adminUser);
-          }
+          // Se respeta la contraseña almacenada en la base de datos (permite cambiarla).
+          setSystemUsers(dbUsers);
         } else {
           const defaults: SystemUser[] = [
             {
@@ -187,11 +181,8 @@ export default function AdminPanel({
         if (saved) {
           try {
             const savedUsers = JSON.parse(saved) as SystemUser[];
-            const normalizedUsers = savedUsers.map(u =>
-              u.username === 'admin' ? { ...u, password: ADMIN_DEFAULT_PASSWORD } : u
-            );
-            setSystemUsers(normalizedUsers);
-            localStorage.setItem('dulce_amanecer_system_users', JSON.stringify(normalizedUsers));
+            // Se respeta la contraseña guardada (permite cambiarla en este dispositivo).
+            setSystemUsers(savedUsers);
             return;
           } catch (e) {}
         }
@@ -942,6 +933,20 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
           >
             Ingresar al Sistema
           </button>
+
+          {/* Indicador de conexión: permite validar desde cualquier dispositivo
+              si la app está usando la base de datos central (Supabase) o solo
+              el almacenamiento local de este dispositivo. */}
+          <div className={`flex items-center justify-center gap-2 text-[11px] font-semibold rounded-xl px-3 py-2 border ${
+            isSupabaseConfigured
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              : 'bg-amber-50 text-amber-700 border-amber-200'
+          }`}>
+            <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+            {isSupabaseConfigured
+              ? 'En línea · usuarios centralizados (Supabase)'
+              : 'Modo local · este dispositivo no está conectado a Supabase'}
+          </div>
         </form>
       </div>
     );
