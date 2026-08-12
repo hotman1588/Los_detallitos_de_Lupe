@@ -223,17 +223,22 @@ export async function getSystemUsers(): Promise<SystemUser[] | null> {
   return data || [];
 }
 
-export async function upsertSystemUser(user: SystemUser): Promise<boolean> {
-  if (!supabase) return false;
+// Devuelve null si todo salió bien, o el mensaje de error para mostrarlo al usuario.
+export async function upsertSystemUserWithError(user: SystemUser): Promise<string | null> {
+  if (!supabase) return 'Supabase no está configurado.';
   const { error } = await supabase
     .from('system_users')
-    .upsert(user);
+    .upsert(user, { onConflict: 'id' });
 
   if (error) {
     console.error('Error saving system user to Supabase:', error);
-    return false;
+    return error.message || 'Error desconocido al guardar el usuario.';
   }
-  return true;
+  return null;
+}
+
+export async function upsertSystemUser(user: SystemUser): Promise<boolean> {
+  return (await upsertSystemUserWithError(user)) === null;
 }
 
 export async function deleteSystemUser(id: string): Promise<boolean> {

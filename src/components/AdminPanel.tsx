@@ -17,6 +17,7 @@ import {
   isSupabaseConfigured,
   getSystemUsers,
   upsertSystemUser,
+  upsertSystemUserWithError,
   deleteSystemUser,
   getConfig,
   saveConfig
@@ -159,7 +160,14 @@ export default function AdminPanel({
     async function loadUsers() {
       if (isSupabaseConfigured) {
         const dbUsers = await getSystemUsers();
-        if (dbUsers && dbUsers.length > 0) {
+        if (dbUsers === null) {
+          // La consulta falló (red o permisos). No se siembran los usuarios por
+          // defecto: hacerlo dejaría la lista incompleta y el siguiente guardado
+          // borraría de la base los usuarios reales que no están en pantalla.
+          console.error('[Usuarios] No se pudo leer system_users; se conserva la lista vacía.');
+          return;
+        }
+        if (dbUsers.length > 0) {
           // Se respeta la contraseña almacenada en la base de datos (permite cambiarla).
           setSystemUsers(dbUsers);
         } else {
@@ -225,10 +233,13 @@ export default function AdminPanel({
     loadUsers();
   }, []);
 
-  const saveSystemUsers = async (newUsers: SystemUser[]) => {
+  // Devuelve null si se guardó bien, o el mensaje de error para avisar al admin.
+  const saveSystemUsers = async (newUsers: SystemUser[]): Promise<string | null> => {
     setSystemUsers(newUsers);
     if (isSupabaseConfigured) {
       const currentDbUsers = await getSystemUsers();
+      // Solo se borran usuarios si la lectura fue exitosa; si falló (null) no se
+      // toca nada, para no vaciar la tabla por un error temporal de conexión.
       if (currentDbUsers) {
         const toDelete = currentDbUsers.filter(dbU => !newUsers.some(u => u.id === dbU.id));
         for (const u of toDelete) {
@@ -236,10 +247,16 @@ export default function AdminPanel({
         }
       }
       for (const u of newUsers) {
-        await upsertSystemUser(u);
+        const err = await upsertSystemUserWithError(u);
+        if (err) return err;
       }
-    } else {
+      return null;
+    }
+    try {
       localStorage.setItem('dulce_amanecer_system_users', JSON.stringify(newUsers));
+      return null;
+    } catch (e: any) {
+      return e?.message || 'No se pudo guardar en el almacenamiento local del navegador.';
     }
   };
 
@@ -696,7 +713,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
   };
 
   // User management handler functions
-  const handleCreateUserSubmit = (e: React.FormEvent) => {
+  const handleCreateUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserCedula.trim() || !newUserName.trim() || !newUserPhone.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
       alert("Por favor completa todos los campos requeridos.");
@@ -729,7 +746,11 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
           role: newUserRole
         } : u
       );
-      saveSystemUsers(updated);
+      const saveError = await saveSystemUsers(updated);
+      if (saveError) {
+        alert(`No se pudo actualizar el usuario en la base de datos:\n\n${saveError}`);
+        return;
+      }
       alert(`¡Usuario "${newUserName.trim()}" actualizado con éxito!`);
     } else {
       // Check duplicate
@@ -749,7 +770,13 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
         role: newUserRole
       };
 
-      saveSystemUsers([...systemUsers, newUser]);
+      const saveError = await saveSystemUsers([...systemUsers, newUser]);
+      if (saveError) {
+        // Se revierte el estado local para no mostrar un usuario que no quedó guardado.
+        setSystemUsers(systemUsers);
+        alert(`No se pudo registrar el usuario en la base de datos:\n\n${saveError}`);
+        return;
+      }
       alert(`¡Usuario "${newUser.name}" registrado con éxito!`);
     }
     
