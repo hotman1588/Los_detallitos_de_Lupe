@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Order, OrderStatus } from '../types';
+import { Order, OrderStatus, SystemUser } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Search, ClipboardList, CheckCircle2, Truck, ClipboardCheck, 
-  Calendar, Clock, User, AlertCircle, FileText, Camera, 
-  MapPin, Sparkles, Heart, Check, ChevronRight, PackageCheck, Send 
+import { isSupabaseConfigured, getSystemUsers } from '../lib/supabaseClient';
+import {
+  Search, ClipboardList, CheckCircle2, Truck, ClipboardCheck,
+  Calendar, Clock, User, AlertCircle, FileText, Camera,
+  MapPin, Sparkles, Heart, Check, ChevronRight, PackageCheck, Send,
+  Phone, MessageCircle, BadgeCheck
 } from 'lucide-react';
 
 interface OrderTrackerProps {
@@ -19,6 +21,40 @@ export default function OrderTracker({ orders }: OrderTrackerProps) {
   const [foundOrder, setFoundOrder] = useState<Order | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [activeTab, setActiveTab] = useState<'status' | 'logistics'>('status');
+  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
+
+  // Carga los usuarios del sistema para poder mostrar los datos del domiciliario asignado.
+  React.useEffect(() => {
+    async function loadUsers() {
+      if (isSupabaseConfigured) {
+        const dbUsers = await getSystemUsers();
+        if (dbUsers && dbUsers.length > 0) {
+          setSystemUsers(dbUsers);
+          return;
+        }
+      }
+      const saved = localStorage.getItem('dulce_amanecer_system_users');
+      if (saved) {
+        try {
+          setSystemUsers(JSON.parse(saved) as SystemUser[]);
+        } catch (e) {}
+      }
+    }
+    loadUsers();
+  }, []);
+
+  const assignedDomi = foundOrder?.assignedDomiUsername
+    ? systemUsers.find(u => u.username === foundOrder.assignedDomiUsername) || null
+    : null;
+
+  // Si el visitante no tiene cargada la lista de usuarios (sin Supabase), al menos
+  // mostramos el usuario asignado en vez de ocultar toda la tarjeta.
+  const domiName = assignedDomi?.name || foundOrder?.assignedDomiUsername || '';
+  const domiPhone = assignedDomi?.phone || '';
+
+  const onlyDigits = (phone?: string) => (phone || '').replace(/\D/g, '');
+  const waLink = (phone: string | undefined, ref: string) =>
+    `https://wa.me/57${onlyDigits(phone)}?text=${encodeURIComponent(`Hola, consulto por mi pedido ${ref} de Los Detallitos de Lupe.`)}`;
 
   const handleTrackSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -420,6 +456,80 @@ export default function OrderTracker({ orders }: OrderTrackerProps) {
                 </div>
               )}
             </div>
+
+            {/* Datos del repartidor asignado (visible si ya hay asignación, o desde que sale a reparto) */}
+            {(statusStep >= 3 || !!foundOrder.assignedDomiUsername) && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-100 shadow-md space-y-5"
+              >
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                  <Truck size={18} className="text-terracotta" />
+                  <h5 className="font-extrabold text-slate-700 text-sm sm:text-base uppercase tracking-wider">
+                    Tu Repartidor Asignado
+                  </h5>
+                </div>
+
+                {foundOrder.assignedDomiUsername ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+                    <div className="w-14 h-14 shrink-0 rounded-2xl bg-gradient-to-br from-sage-primary to-olive-dark text-white flex items-center justify-center font-black text-lg shadow-md">
+                      {domiName.trim().charAt(0).toUpperCase()}
+                    </div>
+
+                    <div className="flex-1 space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-serif font-black text-slate-800 text-lg leading-tight">{domiName}</p>
+                        <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                          <BadgeCheck size={11} /> Verificado
+                        </span>
+                      </div>
+                      {domiPhone ? (
+                        <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
+                          <Phone size={13} className="text-slate-400" />
+                          <a href={`tel:+57${onlyDigits(domiPhone)}`} className="font-mono font-bold text-slate-700 hover:text-terracotta tracking-wider">
+                            {domiPhone}
+                          </a>
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-400 font-medium">
+                          Número de contacto no publicado. Escríbenos por WhatsApp de la tienda y te comunicamos con él.
+                        </p>
+                      )}
+                      <p className="text-[10px] text-slate-400 leading-relaxed">
+                        Domiciliario autónomo encargado de entregar tu sorpresa. Contáctalo solo por temas de la entrega.
+                      </p>
+                    </div>
+
+                    {domiPhone && (
+                      <div className="flex sm:flex-col gap-2 shrink-0">
+                        <a
+                          href={`tel:+57${onlyDigits(domiPhone)}`}
+                          className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider py-2.5 px-4 rounded-2xl transition"
+                        >
+                          <Phone size={13} /> Llamar
+                        </a>
+                        <a
+                          href={waLink(domiPhone, foundOrder.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold uppercase tracking-wider py-2.5 px-4 rounded-2xl transition"
+                        >
+                          <MessageCircle size={13} /> WhatsApp
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-center space-y-1">
+                    <p className="text-xs font-bold text-slate-600">Aún no hay un repartidor asignado a esta orden.</p>
+                    <p className="text-[11px] text-slate-400">
+                      En cuanto el equipo asigne el domicilio, verás aquí su nombre y número de contacto.
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            )}
 
             {/* If delivered and contains deliveryPhotoUrl, show the support photo */}
             {foundOrder.status === 'Entregado' && foundOrder.deliveryPhotoUrl && (
