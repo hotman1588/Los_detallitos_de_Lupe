@@ -296,13 +296,27 @@ export default function App() {
     showToast(`🗑️ Producto eliminado del catálogo.`);
   };
 
-  const handleUpdateOrderStatus = async (orderId: string, status: OrderStatus, deliveryPhotoUrl?: string, assignedDomiUsername?: string) => {
+  const handleUpdateOrderStatus = async (
+    orderId: string,
+    status: OrderStatus,
+    deliveryPhotoUrl?: string,
+    assignedDomiUsername?: string,
+    assignedDomiInfo?: { name: string; phone: string }
+  ) => {
     const updatedList = orders.map(ord =>
-      ord.id === orderId ? { 
-        ...ord, 
+      ord.id === orderId ? {
+        ...ord,
         status,
         ...(deliveryPhotoUrl ? { deliveryPhotoUrl, deliveredAt: new Date().toISOString() } : {}),
-        ...(assignedDomiUsername !== undefined ? { assignedDomiUsername } : {})
+        ...(assignedDomiUsername !== undefined ? { assignedDomiUsername } : {}),
+        // Copia el nombre y teléfono del domiciliario en el pedido para el rastreo público
+        ...(assignedDomiUsername !== undefined ? {
+          shipping: {
+            ...ord.shipping,
+            assignedDomiName: assignedDomiInfo?.name || '',
+            assignedDomiPhone: assignedDomiInfo?.phone || ''
+          }
+        } : {})
       } : ord
     );
     setOrders(updatedList);

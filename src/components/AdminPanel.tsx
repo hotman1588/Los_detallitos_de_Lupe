@@ -30,7 +30,7 @@ interface AdminPanelProps {
   onAddProduct: (product: Product) => void;
   onUpdateProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
-  onUpdateOrderStatus: (orderId: string, status: OrderStatus, deliveryPhotoUrl?: string, assignedDomiUsername?: string) => void;
+  onUpdateOrderStatus: (orderId: string, status: OrderStatus, deliveryPhotoUrl?: string, assignedDomiUsername?: string, assignedDomiInfo?: { name: string; phone: string }) => void;
   onDeleteAllOrders: () => void;
   onAddOrder?: (newOrder: Order) => void;
   onUpdateOrderCoords?: (orderId: string, latlng: { lat: number; lng: number }, locationName?: string) => void;
@@ -2364,8 +2364,9 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
                                         onChange={(e) => {
                                           const selectedVal = e.target.value;
                                           const nextStatus = order.status === 'En Validación' || order.status === 'En Preparación' || order.status === 'En Vali' ? 'En Reparto' : order.status;
-                                          onUpdateOrderStatus(order.id, nextStatus, undefined, selectedVal);
-                                          const label = selectedVal ? systemUsers.find(u => u.username === selectedVal)?.name : 'Ninguno';
+                                          const selectedDomi = systemUsers.find(u => u.username === selectedVal);
+                                          onUpdateOrderStatus(order.id, nextStatus, undefined, selectedVal, selectedDomi ? { name: selectedDomi.name, phone: selectedDomi.phone } : undefined);
+                                          const label = selectedDomi?.name || 'Ninguno';
                                           alert(`Asignado con éxito a ${label}.`);
                                         }}
                                         className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-sage-primary"
@@ -2681,8 +2682,9 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
                                 onChange={(e) => {
                                   const selectedVal = e.target.value;
                                   const nextStatus = order.status === 'En Validación' || order.status === 'En Preparación' || order.status === 'En Vali' ? 'En Reparto' : order.status;
-                                  onUpdateOrderStatus(order.id, nextStatus, undefined, selectedVal);
-                                  const label = selectedVal ? systemUsers.find(u => u.username === selectedVal)?.name : 'Ninguno';
+                                  const selectedDomi = systemUsers.find(u => u.username === selectedVal);
+                                  onUpdateOrderStatus(order.id, nextStatus, undefined, selectedVal, selectedDomi ? { name: selectedDomi.name, phone: selectedDomi.phone } : undefined);
+                                  const label = selectedDomi?.name || 'Ninguno';
                                   alert(`Asignado con éxito a ${label}.`);
                                 }}
                                 className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-sage-primary"

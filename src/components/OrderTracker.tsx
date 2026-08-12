@@ -47,10 +47,14 @@ export default function OrderTracker({ orders }: OrderTrackerProps) {
     ? systemUsers.find(u => u.username === foundOrder.assignedDomiUsername) || null
     : null;
 
-  // Si el visitante no tiene cargada la lista de usuarios (sin Supabase), al menos
-  // mostramos el usuario asignado en vez de ocultar toda la tarjeta.
-  const domiName = assignedDomi?.name || foundOrder?.assignedDomiUsername || '';
-  const domiPhone = assignedDomi?.phone || '';
+  // Prioriza la ficha del usuario; si el visitante no tiene cargada la lista de
+  // usuarios, usa el nombre/teléfono copiados en el pedido al asignar el domicilio.
+  const domiName =
+    assignedDomi?.name ||
+    foundOrder?.shipping.assignedDomiName ||
+    foundOrder?.assignedDomiUsername ||
+    '';
+  const domiPhone = assignedDomi?.phone || foundOrder?.shipping.assignedDomiPhone || '';
 
   const onlyDigits = (phone?: string) => (phone || '').replace(/\D/g, '');
   const waLink = (phone: string | undefined, ref: string) =>

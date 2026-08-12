@@ -52,6 +52,10 @@ export interface ShippingDetails {
   cardPhotos?: { url: string; name: string }[]; // Support multiple photos up to 5
   locationLatLng?: { lat: number; lng: number };
   locationName?: string;
+  // Datos del domiciliario copiados al asignarlo, para que el portal de rastreo
+  // los muestre sin necesidad de consultar la tabla de usuarios del sistema.
+  assignedDomiName?: string;
+  assignedDomiPhone?: string;
 }
 
 export type OrderStatus = 'En Validación' | 'En Preparación' | 'En Reparto' | 'Entregado' | 'Rechazado';
