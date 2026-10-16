@@ -86,7 +86,34 @@ export default function AdminPanel({
   // New Orders audio-visual tracking states
   // Ids ya vistos; null hasta la primera carga, para no avisar por los pedidos existentes.
   const knownOrderIdsRef = React.useRef<Set<string> | null>(null);
-  const [newOrderAlert, setNewOrderAlert] = useState<Order | null>(null);
+  // Avisos de pedidos nuevos: se apilan y cada uno se cierra solo a los 20 segundos.
+  const ORDER_ALERT_MS = 20000;
+  const [orderAlerts, setOrderAlerts] = useState<Order[]>([]);
+  const alertTimersRef = React.useRef<Record<string, number>>({});
+
+  const dismissOrderAlert = (orderId: string) => {
+    window.clearTimeout(alertTimersRef.current[orderId]);
+    delete alertTimersRef.current[orderId];
+    setOrderAlerts(prev => prev.filter(o => o.id !== orderId));
+  };
+
+  const pushOrderAlerts = (newOrders: Order[]) => {
+    setOrderAlerts(prev => [...prev, ...newOrders.filter(o => !prev.some(p => p.id === o.id))]);
+    newOrders.forEach(order => {
+      window.clearTimeout(alertTimersRef.current[order.id]);
+      alertTimersRef.current[order.id] = window.setTimeout(() => dismissOrderAlert(order.id), ORDER_ALERT_MS);
+    });
+  };
+
+  React.useEffect(() => () => {
+    Object.values(alertTimersRef.current).forEach((t: number) => window.clearTimeout(t));
+  }, []);
+
+  // Grupos del módulo de órdenes: pendientes (por gestionar) y finalizados (entregados o rechazados).
+  const PENDING_STATUSES: OrderStatus[] = ['En Validación', 'En Preparación', 'En Reparto'];
+  const FINISHED_STATUSES: OrderStatus[] = ['Entregado', 'Rechazado'];
+  const [orderStatusGroup, setOrderStatusGroup] = useState<'todos' | 'pendientes' | 'finalizados'>('todos');
+  const validationCount = (orders || []).filter(o => o.status === 'En Validación').length;
 
   const playNotificationTone = () => {
     try {
@@ -115,9 +142,10 @@ export default function AdminPanel({
   };
 
   const handleGoToOrder = (orderId: string) => {
+    setActiveTab('orders');
+    setOrderStatusGroup('todos');
     setExpandedOrderID(orderId);
-    setNewOrderAlert(null);
-    playNotificationTone();
+    dismissOrderAlert(orderId);
     
     // Smooth scroll down to order row or card
     setTimeout(() => {
@@ -142,9 +170,9 @@ export default function AdminPanel({
     const known = knownOrderIdsRef.current;
     knownOrderIdsRef.current = new Set(orders.map(o => o.id));
     if (!known) return; // primera carga tras ingresar: no es un pedido nuevo
-    const newOrder = orders.find(o => !known.has(o.id));
-    if (newOrder && canUseAdminDashboard) {
-      setNewOrderAlert(newOrder);
+    const newOrders = orders.filter(o => !known.has(o.id));
+    if (newOrders.length > 0 && canUseAdminDashboard) {
+      pushOrderAlerts(newOrders);
       playNotificationTone();
     }
   }, [orders, isLoggedIn, canUseAdminDashboard]);
@@ -279,6 +307,13 @@ export default function AdminPanel({
   // Compute filtered and sorted orders for Administrator view
   const filteredAndSortedOrders = React.useMemo(() => {
     let result = [...(orders || [])];
+
+    // 0. Grupo de estado (Todos / Pendientes / Finalizados)
+    if (orderStatusGroup === 'pendientes') {
+      result = result.filter(o => PENDING_STATUSES.includes(o.status));
+    } else if (orderStatusGroup === 'finalizados') {
+      result = result.filter(o => FINISHED_STATUSES.includes(o.status));
+    }
     
     // 1. Intelligent Search Filter (ID de venta, cedula, nombres, etc.)
     if (adminSearchQuery.trim()) {
@@ -351,7 +386,7 @@ export default function AdminPanel({
     });
 
     return result;
-  }, [orders, adminSearchQuery, adminSortColumn, adminSortOrder]);
+  }, [orders, adminSearchQuery, adminSortColumn, adminSortOrder, orderStatusGroup]);
 
   // Approximate coordinate reference points for Bogotá and Soacha (Center coordinates)
   const LOCALITY_COORDINATES: Record<string, { lat: number; lng: number }> = {
@@ -1623,42 +1658,75 @@ export default function AdminPanel({
       {/* ALERTA VISUAL EN LA ESQUINA SUPERIOR DERECHA (NUEVO PEDIDO) */}
       {/* Portal al <body>: fuera del contenedor animado del portal, que crea su propia capa
           y dejaba el aviso debajo del encabezado fijo. */}
-      {newOrderAlert && createPortal(
-        <div className="fixed top-4 right-4 left-4 sm:left-auto z-[60] sm:w-full max-w-sm bg-slate-900 border border-slate-800 text-white rounded-2xl shadow-2xl p-4 animate-fadeIn font-sans">
-          <div className="flex items-start gap-4">
-            <span className="text-3xl animate-bounce select-none">🛎️</span>
-            <div className="flex-1 min-w-0">
-              <h4 className="text-xs font-black uppercase tracking-widest text-amber-400">¡Pedido Recibido!</h4>
-              <p className="text-xs text-slate-300 mt-1 leading-normal">
-                La orden <strong className="text-white font-bold">{newOrderAlert.id}</strong> fue registrada por <strong className="text-white font-bold">{newOrderAlert.shipping.buyerName}</strong>.
-              </p>
-              
-              <div className="flex items-center gap-2 mt-3 text-xs">
+      {(orderAlerts.length > 0 || (canUseAdminDashboard && validationCount > 0)) && createPortal(
+        <div className="fixed top-4 right-4 left-4 sm:left-auto z-[60] sm:w-full max-w-sm flex flex-col gap-2 max-h-[calc(100vh-2rem)] overflow-y-auto font-sans">
+          {/* Recordatorio fijo: pedidos en validación, para que no se pase ninguno */}
+          {canUseAdminDashboard && validationCount > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('orders');
+                setOrderStatusGroup('pendientes');
+                document.getElementById('admin-orders-filters')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }}
+              className="w-full bg-gradient-to-r from-amber-500 to-terracotta text-slate-950 rounded-2xl shadow-xl px-4 py-3 flex items-center gap-3 text-left cursor-pointer hover:shadow-2xl transition ring-1 ring-amber-300"
+            >
+              <span className="bg-slate-950 text-amber-400 text-sm font-black w-9 h-9 rounded-full flex items-center justify-center shrink-0">
+                {validationCount}
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[11px] font-black uppercase tracking-widest">Pendientes por validar</span>
+                <span className="block text-[11px] font-semibold">
+                  {validationCount === 1 ? '1 pedido está' : `${validationCount} pedidos están`} en validación. Toca para revisarlos.
+                </span>
+              </span>
+              <span className="text-lg font-black">➔</span>
+            </button>
+          )}
+
+          {orderAlerts.map(alertOrder => (
+            <div key={alertOrder.id} className="relative bg-slate-900 border border-slate-800 text-white rounded-2xl shadow-2xl p-4 pt-5 animate-fadeIn overflow-hidden">
+              {/* Barra que se vacía durante los 20 segundos del aviso */}
+              <div className="absolute top-0 left-0 right-0 h-1 bg-slate-800">
+                <div className="h-full bg-gradient-to-r from-amber-400 to-terracotta animate-shrinkBar" style={{ animationDuration: `${ORDER_ALERT_MS}ms` }} />
+              </div>
+              <div className="flex items-start gap-4">
+                <span className="text-3xl animate-bounce select-none">🛎️</span>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-amber-400">¡Pedido Recibido!</h4>
+                  <p className="text-xs text-slate-300 mt-1 leading-normal">
+                    La orden <strong className="text-white font-bold">{alertOrder.id}</strong> fue registrada por <strong className="text-white font-bold">{alertOrder.shipping.buyerName}</strong>.
+                  </p>
+
+                  <div className="flex items-center gap-2 mt-3 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => playNotificationTone()}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold px-2 py-1.5 rounded-lg transition-all flex items-center gap-1 cursor-pointer select-none"
+                      title="Reproducir sonido de notificación"
+                    >
+                      🔊 Sonar Tono
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleGoToOrder(alertOrder.id)}
+                      className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 text-[10px] font-black px-3 py-1.5 rounded-lg shadow-xs transition-all text-center cursor-pointer select-none"
+                    >
+                      Validar y Tramitar ➔
+                    </button>
+                  </div>
+                </div>
                 <button
+                  onClick={() => dismissOrderAlert(alertOrder.id)}
+                  className="text-slate-500 hover:text-slate-200 transition text-sm p-1 cursor-pointer font-bold"
                   type="button"
-                  onClick={() => playNotificationTone()}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold px-2 py-1.5 rounded-lg transition-all flex items-center gap-1 cursor-pointer select-none"
-                  title="Reproducir sonido de notificación"
+                  aria-label="Cerrar aviso"
                 >
-                  🔊 Sonar Tono
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleGoToOrder(newOrderAlert.id)}
-                  className="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 text-[10px] font-black px-3 py-1.5 rounded-lg shadow-xs transition-all text-center cursor-pointer select-none"
-                >
-                  Validar y Tramitar ➔
+                  ✕
                 </button>
               </div>
             </div>
-            <button
-              onClick={() => setNewOrderAlert(null)}
-              className="text-slate-500 hover:text-slate-200 transition text-sm p-1 cursor-pointer font-bold"
-              type="button"
-            >
-              ✕
-            </button>
-          </div>
+          ))}
         </div>
       , document.body)}
 
@@ -1887,7 +1955,33 @@ export default function AdminPanel({
           </div>
 
           {/* Controls Bar for Searching and switching layout */}
-          <div className="bg-white rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-xs space-y-4 font-sans">
+          <div id="admin-orders-filters" className="bg-white rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-xs space-y-4 font-sans scroll-mt-24">
+            {/* Grupos de estado: todos, pendientes por gestionar y finalizados */}
+            <div className="flex flex-wrap items-center gap-2">
+              {([
+                { key: 'todos', label: '📦 Todos', count: orders.length, active: 'bg-slate-800 text-white border-slate-800' },
+                { key: 'pendientes', label: '⏳ Pendientes', count: orders.filter(o => PENDING_STATUSES.includes(o.status)).length, active: 'bg-amber-500 text-slate-950 border-amber-500' },
+                { key: 'finalizados', label: '✅ Finalizados', count: orders.filter(o => FINISHED_STATUSES.includes(o.status)).length, active: 'bg-emerald-600 text-white border-emerald-600' }
+              ] as const).map(group => (
+                <button
+                  key={group.key}
+                  type="button"
+                  onClick={() => setOrderStatusGroup(group.key)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold border transition flex items-center gap-2 cursor-pointer ${
+                    orderStatusGroup === group.key ? `${group.active} shadow-sm` : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {group.label}
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${orderStatusGroup === group.key ? 'bg-white/25' : 'bg-slate-100 text-slate-600'}`}>
+                    {group.count}
+                  </span>
+                </button>
+              ))}
+              <span className="text-[11px] text-slate-400 font-medium">
+                Pendientes: en validación, preparación o reparto · Finalizados: entregados o rechazados
+              </span>
+            </div>
+
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               {/* Intelligent Search Input */}
               <div className="flex-1 relative">
@@ -1975,12 +2069,18 @@ export default function AdminPanel({
           ) : filteredAndSortedOrders.length === 0 ? (
             <div className="text-center py-16 bg-slate-50 rounded-2xl border border-dashed border-slate-200 font-sans">
               <Search size={32} className="mx-auto text-slate-300 mb-2" />
-              <p className="text-slate-500 text-sm font-medium">Ningún pedido coincide con tu búsqueda inteligente.</p>
+              <p className="text-slate-500 text-sm font-medium">
+                {adminSearchQuery.trim()
+                  ? 'Ningún pedido coincide con tu búsqueda inteligente.'
+                  : orderStatusGroup === 'pendientes'
+                  ? '¡Al día! No hay pedidos pendientes por gestionar.'
+                  : 'Aún no hay pedidos finalizados.'}
+              </p>
               <button
-                onClick={() => setAdminSearchQuery('')}
+                onClick={() => { setAdminSearchQuery(''); setOrderStatusGroup('todos'); }}
                 className="mt-2 text-xs font-bold text-sage-primary hover:underline font-mono"
               >
-                Limpiar filtros de búsqueda
+                Ver todos los pedidos
               </button>
             </div>
           ) : ordersViewMode === 'table' ? (
