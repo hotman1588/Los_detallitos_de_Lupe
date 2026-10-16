@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Product, Order, OrderStatus, SystemUser } from '../types';
 import { 
   Eye, CheckCircle2, XCircle, Plus, Edit2, Trash2, ShieldCheck, LogOut, 
@@ -1619,9 +1620,11 @@ export default function AdminPanel({
 
   return (
     <div id="admin-dashboard" className="max-w-7xl mx-auto my-6 px-4 font-sans relative">
-      {/* ALERTA VISUAL EN LA PARTE SUPERIOR IZQUIERDA (NUEVO PEDIDO) */}
-      {newOrderAlert && (
-        <div className="fixed top-24 left-6 z-50 max-w-sm w-full bg-slate-900 border border-slate-800 text-white rounded-2xl shadow-2xl p-4 animate-fadeIn font-sans">
+      {/* ALERTA VISUAL EN LA ESQUINA SUPERIOR DERECHA (NUEVO PEDIDO) */}
+      {/* Portal al <body>: fuera del contenedor animado del portal, que crea su propia capa
+          y dejaba el aviso debajo del encabezado fijo. */}
+      {newOrderAlert && createPortal(
+        <div className="fixed top-4 right-4 left-4 sm:left-auto z-[60] sm:w-full max-w-sm bg-slate-900 border border-slate-800 text-white rounded-2xl shadow-2xl p-4 animate-fadeIn font-sans">
           <div className="flex items-start gap-4">
             <span className="text-3xl animate-bounce select-none">🛎️</span>
             <div className="flex-1 min-w-0">
@@ -1657,7 +1660,7 @@ export default function AdminPanel({
             </button>
           </div>
         </div>
-      )}
+      , document.body)}
 
       <div className="bg-slate-800 text-white rounded-3xl p-6 md:p-8 shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
