@@ -9,3 +9,6 @@ coverage/
 
 .vercel
 .env*
+
+# Archivos internos de la CLI de Supabase
+supabase/.temp
