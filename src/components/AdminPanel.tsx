@@ -9,10 +9,11 @@ import {
   Eye, CheckCircle2, XCircle, Plus, Edit2, Trash2, ShieldCheck, LogOut, 
   ChevronDown, ChevronUp, Image as ImageIcon, MapPin, Compass, Camera, 
   Navigation, Upload, Clock, Truck, ExternalLink, Check, RefreshCcw, CheckSquare,
-  Search, SlidersHorizontal, Database
+  Search, SlidersHorizontal, Database, KeyRound
 } from 'lucide-react';
-import { compressImageBase64 } from '../lib/promoUtils';
+import { compressImageBase64, getProductEffectivePrice } from '../lib/promoUtils';
 import MapPicker from './MapPicker';
+import ChangeMyPasswordModal from './ChangeMyPasswordModal';
 import {
   isSupabaseConfigured,
   getSystemUsers,
@@ -65,6 +66,7 @@ export default function AdminPanel({
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [showMyPasswordModal, setShowMyPasswordModal] = useState(false);
   const canUseAdminDashboard = userRole === 'admin' || userRole === 'supervisor';
   const canDeleteOrders = userRole === 'admin';
   const canSimulateOrders = userRole === 'admin';
@@ -81,7 +83,8 @@ export default function AdminPanel({
   };
 
   // New Orders audio-visual tracking states
-  const prevOrdersCountRef = React.useRef(orders ? orders.length : 0);
+  // Ids ya vistos; null hasta la primera carga, para no avisar por los pedidos existentes.
+  const knownOrderIdsRef = React.useRef<Set<string> | null>(null);
   const [newOrderAlert, setNewOrderAlert] = useState<Order | null>(null);
 
   const playNotificationTone = () => {
@@ -128,18 +131,29 @@ export default function AdminPanel({
     }, 150);
   };
 
-  // Monitor incoming orders to play chime and display top-left overlay
+  // Avisa (sonido + ventana) solo cuando aparece un pedido que no estaba en la lista anterior.
   React.useEffect(() => {
-    if (orders && orders.length > prevOrdersCountRef.current) {
-      // Isolate the newly added order
-      const newOrder = orders.find(o => !orders.some(prevO => false)) || orders[0];
-      if (newOrder && isLoggedIn && canUseAdminDashboard) {
-        setNewOrderAlert(newOrder);
-        playNotificationTone();
-      }
+    if (!isLoggedIn) {
+      knownOrderIdsRef.current = null;
+      return;
     }
-    prevOrdersCountRef.current = orders ? orders.length : 0;
+    if (!orders || orders.length === 0) return;
+    const known = knownOrderIdsRef.current;
+    knownOrderIdsRef.current = new Set(orders.map(o => o.id));
+    if (!known) return; // primera carga tras ingresar: no es un pedido nuevo
+    const newOrder = orders.find(o => !known.has(o.id));
+    if (newOrder && canUseAdminDashboard) {
+      setNewOrderAlert(newOrder);
+      playNotificationTone();
+    }
   }, [orders, isLoggedIn, canUseAdminDashboard]);
+
+  // Consulta pedidos nuevos cada 30 segundos mientras haya sesión abierta.
+  React.useEffect(() => {
+    if (!isLoggedIn) return;
+    const timer = window.setInterval(() => { onRefreshOrders(); }, 30000);
+    return () => window.clearInterval(timer);
+  }, [isLoggedIn]);
 
   // Domiciliario Proof of Delivery states
   const [uploadingPhotos, setUploadingPhotos] = useState<Record<string, string>>({}); // orderId -> Base64
@@ -552,10 +566,6 @@ export default function AdminPanel({
       alert("Por favor completa todos los campos requeridos.");
       return;
     }
-    if (newUserPassword && newUserPassword.length < 8) {
-      alert("La contraseña debe tener al menos 8 caracteres.");
-      return;
-    }
     const usernameVal = newUserUsername.trim() || newUserCedula.trim();
     if (!canAssignAdminRole && newUserRole === 'admin') {
       alert("El rol supervisor no puede crear ni asignar usuarios con rol administrador.");
@@ -597,16 +607,12 @@ export default function AdminPanel({
 
   const handleChangePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPasswordValue.trim() || !changingPasswordUser) {
+    if (!newPasswordValue || !changingPasswordUser) {
       alert("Por favor ingresa una contraseña válida.");
       return;
     }
-    if (newPasswordValue.trim().length < 8) {
-      alert("La contraseña debe tener al menos 8 caracteres.");
-      return;
-    }
 
-    const saveError = await saveSystemUser(changingPasswordUser.id, changingPasswordUser, newPasswordValue.trim());
+    const saveError = await saveSystemUser(changingPasswordUser.id, changingPasswordUser, newPasswordValue);
     if (saveError) {
       alert(`No se pudo cambiar la contraseña:\n\n${saveError}`);
       return;
@@ -924,13 +930,25 @@ export default function AdminPanel({
               </p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="bg-slate-700 hover:bg-slate-600 text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-2 transition cursor-pointer"
-          >
-            <LogOut size={14} />
-            Cerrar Sesión Domiciliario
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => setShowMyPasswordModal(true)}
+              className="bg-gradient-to-r from-earth-brown to-sage-primary hover:shadow-lg text-white text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-1.5 transition cursor-pointer ring-1 ring-terracotta/40"
+            >
+              <KeyRound size={14} className="text-terracotta" />
+              Cambiar mi contraseña
+            </button>
+            {showMyPasswordModal && currentUser && (
+              <ChangeMyPasswordModal userName={currentUser.name} onClose={() => setShowMyPasswordModal(false)} />
+            )}
+            <button
+              onClick={handleLogout}
+              className="bg-slate-700 hover:bg-slate-600 text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-2 transition cursor-pointer"
+            >
+              <LogOut size={14} />
+              Cerrar Sesión Domiciliario
+            </button>
+          </div>
         </div>
 
         {/* Tab Selection Filter */}
@@ -1700,6 +1718,11 @@ export default function AdminPanel({
             <button
               onClick={async () => {
                 const randomIdNum = Math.floor(10000 + Math.random() * 90000);
+                if (!products[0]) {
+                  alert('Agrega al menos un producto al catálogo para simular un pedido.');
+                  return;
+                }
+                const mockUnitPrice = getProductEffectivePrice(products[0], categoryDiscounts);
                 const mockOrder: Order = {
                   id: `${adminIdPrefix || 'LDL-'}${randomIdNum}`,
                   shipping: {
@@ -1723,7 +1746,9 @@ export default function AdminPanel({
                       quantity: 1
                     }
                   ],
-                  total: (products[0]?.price || 95000) + 12000,
+                  subtotal: mockUnitPrice,
+                  shippingFee: 12000,
+                  total: mockUnitPrice + 12000,
                   paymentReceiptUrl: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&auto=format&fit=crop&q=80",
                   status: "En Validación",
                   createdAt: new Date().toISOString()
@@ -1743,6 +1768,16 @@ export default function AdminPanel({
             </button>
           )}
 
+          <button
+            onClick={() => setShowMyPasswordModal(true)}
+            className="bg-gradient-to-r from-earth-brown to-sage-primary hover:shadow-lg text-white text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-1.5 transition cursor-pointer ring-1 ring-terracotta/40"
+          >
+            <KeyRound size={14} className="text-terracotta" />
+            Cambiar mi contraseña
+          </button>
+          {showMyPasswordModal && currentUser && (
+            <ChangeMyPasswordModal userName={currentUser.name} onClose={() => setShowMyPasswordModal(false)} />
+          )}
           <button
             onClick={handleLogout}
             className="bg-slate-700 hover:bg-slate-600 text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-1.5 transition cursor-pointer text-slate-200 border border-slate-600"
@@ -3599,11 +3634,10 @@ export default function AdminPanel({
                   <input
                     type="password"
                     required={!editingUser}
-                    minLength={8}
                     autoComplete="new-password"
                     value={newUserPassword}
                     onChange={(e) => setNewUserPassword(e.target.value)}
-                    placeholder={editingUser ? 'Déjala vacía para conservar la actual' : 'Mínimo 8 caracteres'}
+                    placeholder={editingUser ? 'Déjala vacía para conservar la actual' : 'Números, letras y/o símbolos'}
                     className="w-full bg-slate-55/40 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-sage-primary text-slate-800"
                   />
                 </div>

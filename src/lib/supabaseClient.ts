@@ -290,3 +290,13 @@ export async function saveConfig(key: string, value: any): Promise<string | null
   const { error } = await rpc('staff_save_config', { p_token: staffToken(), p_key: key, p_value: value });
   return error || null;
 }
+
+// Cambio de contraseña del propio usuario (exige la actual). Sin reglas de formato.
+export async function changeOwnPassword(currentPassword: string, newPassword: string): Promise<string | null> {
+  const { error } = await rpc('staff_change_own_password', {
+    p_token: staffToken(),
+    p_current: currentPassword,
+    p_new: newPassword
+  });
+  return error || null;
+}
