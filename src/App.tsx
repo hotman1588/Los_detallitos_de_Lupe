@@ -11,16 +11,18 @@ import ProductCarousel from './components/ProductCarousel';
 import CheckoutFlow from './components/CheckoutFlow';
 import AdminPanel from './components/AdminPanel';
 import OrderTracker from './components/OrderTracker';
-import { getProductDiscount, getProductEffectivePrice, safeSaveOrders } from './lib/promoUtils';
+import { getProductDiscount, getProductEffectivePrice } from './lib/promoUtils';
 import { ShoppingCart, Search, Eye, ShoppingBag, ListFilter, CheckCircle, Heart, Truck, Gift, MessageCircle, Flower2, Crown } from 'lucide-react';
 import {
   isSupabaseConfigured,
   getProducts,
-  upsertProduct,
-  deleteProduct,
-  getOrders,
-  upsertOrder,
-  deleteAllOrders,
+  saveProduct,
+  removeProduct,
+  getStaffOrders,
+  createOrder,
+  updateOrderStatus,
+  updateOrderCoords,
+  deleteOpenOrders,
   getConfig,
   saveConfig
 } from './lib/supabaseClient';
@@ -67,26 +69,9 @@ export default function App() {
   useEffect(() => {
     async function loadData() {
       if (isSupabaseConfigured) {
-        // Load products
+        // Load products (los pedidos solo se cargan al ingresar al portal)
         const dbProducts = await getProducts();
-        if (dbProducts && dbProducts.length > 0) {
-          setProducts(dbProducts);
-        } else {
-          // If Supabase table is empty, seed it locally for the state
-          setProducts(INITIAL_PRODUCTS);
-          // Try to upsert to seed Supabase
-          for (const prod of INITIAL_PRODUCTS) {
-            await upsertProduct(prod);
-          }
-        }
-
-        // Load orders
-        const dbOrders = await getOrders();
-        if (dbOrders) {
-          setOrders(dbOrders);
-        } else {
-          setOrders([]);
-        }
+        setProducts(dbProducts && dbProducts.length > 0 ? dbProducts : INITIAL_PRODUCTS);
 
         // Load category discounts
         const dbDiscounts = await getConfig('category_discounts', { desayunos: 0, flores: 0, detalles: 0 });
@@ -102,52 +87,9 @@ export default function App() {
           }
         } else {
           setProducts(INITIAL_PRODUCTS);
-          localStorage.setItem('dulce_amanecer_products', JSON.stringify(INITIAL_PRODUCTS));
         }
 
-        // 2. Orders (We inject a sample order if empty)
-        const storedOrders = localStorage.getItem('dulce_amanecer_orders');
-        if (storedOrders) {
-          try {
-            setOrders(JSON.parse(storedOrders));
-          } catch (e) {
-            setOrders([]);
-          }
-        } else {
-          const sampleItem = INITIAL_PRODUCTS[0];
-          const sampleOrder: Order = {
-            id: "LDL-70411",
-            shipping: {
-              buyerName: "Carlos Restrepo",
-              buyerPhone: "3114119692",
-              buyerCedula: "1016016370",
-              recipientName: "Liliana Restrepo",
-              recipientPhone: "3137775543",
-              municipio: "Bogotá D.C.",
-              localidad: "Chapinero (Localidad 2)",
-              barrio: "Rosales",
-              direccionDetallada: "Calle 78 # 4 - 32 Apto 501",
-              indicacionesAdicionales: "Edificio de ladrillo frente a parque, entregar al vigilante",
-              fechaEntrega: "2026-06-25",
-              horaEntrega: "07:00 AM - 09:00 AM",
-              mensajeTarjeta: "Mami hermosa, feliz día de las madres. Aunque la distancia física nos separe, mi corazón y amor siempre te acompaña. Disfruta este delicioso desayuno sorpresa especial que preparé para ti. Te amo infinitamente."
-            },
-            items: [
-              {
-                product: sampleItem,
-                quantity: 1
-              }
-            ],
-            total: sampleItem.price + 12000, // Product pricing + shipping fee
-            paymentReceiptUrl: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&auto=format&fit=crop&q=80",
-            status: "En Validación",
-            createdAt: new Date().toISOString()
-          };
-          setOrders([sampleOrder]);
-          safeSaveOrders([sampleOrder]);
-        }
-
-        // 4. Category Discounts State
+        // 2. Category Discounts State
         const storedCategoryDiscounts = localStorage.getItem('dulce_amanecer_category_discounts');
         if (storedCategoryDiscounts) {
           try {
@@ -210,11 +152,12 @@ export default function App() {
   };
 
   const handleUpdateCategoryDiscounts = async (newDiscounts: Record<string, number>) => {
+    const previous = categoryDiscounts;
     setCategoryDiscounts(newDiscounts);
-    if (isSupabaseConfigured) {
-      await saveConfig('category_discounts', newDiscounts);
-    } else {
-      localStorage.setItem('dulce_amanecer_category_discounts', JSON.stringify(newDiscounts));
+    const error = await saveConfig('category_discounts', newDiscounts);
+    if (error) {
+      setCategoryDiscounts(previous);
+      showToast(`⚠️ No se guardaron los descuentos: ${error}`);
     }
   };
 
@@ -255,117 +198,88 @@ export default function App() {
     updateCartState([]);
   };
 
-  // Order Submission (triggered from Checkout Flow)
-  const handleNewOrder = async (newOrder: Order) => {
-    const updatedOrders = [newOrder, ...orders];
-    setOrders(updatedOrders);
-    if (isSupabaseConfigured) {
-      await upsertOrder(newOrder);
-    } else {
-      safeSaveOrders(updatedOrders);
-    }
+  // Order Submission (triggered from Checkout Flow). El servidor asigna el número de orden.
+  const handleNewOrder = async (newOrder: Omit<Order, 'id'>): Promise<{ id?: string; error?: string }> => {
+    return createOrder(newOrder);
+  };
+
+  // Pedidos visibles en el portal según el rol de la sesión activa.
+  const refreshStaffOrders = async () => {
+    const staffOrders = await getStaffOrders();
+    setOrders(staffOrders || []);
+  };
+
+  const replaceOrder = (updated: Order) => {
+    setOrders(prev => prev.map(o => (o.id === updated.id ? updated : o)));
   };
 
   // ADMIN ACTIONS: Catalog CRUD + Order Approvals
   const handleAddNewProductGroup = async (newProd: Product) => {
-    const updatedList = [newProd, ...products];
-    setProducts(updatedList);
-    if (isSupabaseConfigured) {
-      await upsertProduct(newProd);
-    } else {
-      localStorage.setItem('dulce_amanecer_products', JSON.stringify(updatedList));
+    const error = await saveProduct(newProd);
+    if (error) {
+      showToast(`⚠️ No se pudo crear el producto: ${error}`);
+      return;
     }
+    setProducts(prev => [newProd, ...prev]);
     showToast(`✨ Producto "${newProd.name}" creado e ingresado al catálogo virtual.`);
   };
 
   const handleUpdateProductGroup = async (updatedProd: Product) => {
-    const updatedList = products.map(p => p.id === updatedProd.id ? updatedProd : p);
-    setProducts(updatedList);
-    if (isSupabaseConfigured) {
-      await upsertProduct(updatedProd);
-    } else {
-      localStorage.setItem('dulce_amanecer_products', JSON.stringify(updatedList));
+    const error = await saveProduct(updatedProd);
+    if (error) {
+      showToast(`⚠️ No se guardaron los cambios: ${error}`);
+      return;
     }
+    setProducts(prev => prev.map(p => p.id === updatedProd.id ? updatedProd : p));
     showToast(`💾 Cambios guardados para "${updatedProd.name}".`);
   };
 
   const handleDeleteProductGroup = async (id: string) => {
-    const updatedList = products.filter(p => p.id !== id);
-    setProducts(updatedList);
-    if (isSupabaseConfigured) {
-      await deleteProduct(id);
-    } else {
-      localStorage.setItem('dulce_amanecer_products', JSON.stringify(updatedList));
+    const error = await removeProduct(id);
+    if (error) {
+      showToast(`⚠️ No se pudo eliminar el producto: ${error}`);
+      return;
     }
+    setProducts(prev => prev.filter(p => p.id !== id));
     showToast(`🗑️ Producto eliminado del catálogo.`);
   };
 
+  // assignedDomiUsername: undefined = no cambiar, '' = quitar asignación.
   const handleUpdateOrderStatus = async (
     orderId: string,
     status: OrderStatus,
     deliveryPhotoUrl?: string,
-    assignedDomiUsername?: string,
-    assignedDomiInfo?: { name: string; phone: string }
-  ) => {
-    const updatedList = orders.map(ord =>
-      ord.id === orderId ? {
-        ...ord,
-        status,
-        ...(deliveryPhotoUrl ? { deliveryPhotoUrl, deliveredAt: new Date().toISOString() } : {}),
-        ...(assignedDomiUsername !== undefined ? { assignedDomiUsername } : {}),
-        // Copia el nombre y teléfono del domiciliario en el pedido para el rastreo público
-        ...(assignedDomiUsername !== undefined ? {
-          shipping: {
-            ...ord.shipping,
-            assignedDomiName: assignedDomiInfo?.name || '',
-            assignedDomiPhone: assignedDomiInfo?.phone || ''
-          }
-        } : {})
-      } : ord
-    );
-    setOrders(updatedList);
-    
-    if (isSupabaseConfigured) {
-      const orderToUpdate = updatedList.find(o => o.id === orderId);
-      if (orderToUpdate) {
-        await upsertOrder(orderToUpdate);
-      }
-    } else {
-      safeSaveOrders(updatedList);
+    assignedDomiUsername?: string
+  ): Promise<boolean> => {
+    const { order, error } = await updateOrderStatus(orderId, status, deliveryPhotoUrl, assignedDomiUsername);
+    if (error || !order) {
+      alert(`No se pudo actualizar el pedido ${orderId}:
+
+${error || 'Error desconocido.'}`);
+      return false;
     }
+    replaceOrder(order);
+    return true;
   };
 
   const handleUpdateOrderCoords = async (orderId: string, latlng: { lat: number; lng: number }) => {
-    const updatedList = orders.map(ord =>
-      ord.id === orderId ? {
-        ...ord,
-        shipping: {
-          ...ord.shipping,
-          locationLatLng: latlng
-        }
-      } : ord
-    );
-    setOrders(updatedList);
-    
-    if (isSupabaseConfigured) {
-      const orderToUpdate = updatedList.find(o => o.id === orderId);
-      if (orderToUpdate) {
-        await upsertOrder(orderToUpdate);
-      }
-    } else {
-      safeSaveOrders(updatedList);
+    const { order, error } = await updateOrderCoords(orderId, latlng.lat, latlng.lng);
+    if (error || !order) {
+      showToast(`⚠️ No se actualizó la ubicación: ${error || 'Error desconocido.'}`);
+      return;
     }
+    replaceOrder(order);
     showToast(`📍 Georreferenciación de orden #${orderId} actualizada con éxito.`);
   };
 
   const handleDeleteAllOrders = async () => {
-    setOrders([]);
-    if (isSupabaseConfigured) {
-      await deleteAllOrders();
-    } else {
-      localStorage.setItem('dulce_amanecer_orders', JSON.stringify([]));
+    const { count, error } = await deleteOpenOrders();
+    if (error) {
+      showToast(`⚠️ No se eliminaron los pedidos: ${error}`);
+      return;
     }
-    showToast("🗑️ Se han eliminado todas las órdenes del sistema con éxito.");
+    await refreshStaffOrders();
+    showToast(`🗑️ Se eliminaron ${count} pedidos no entregados. Los entregados se conservan.`);
   };
 
   // Filter Catalog Products
@@ -671,7 +585,7 @@ export default function App() {
         {/* VIEW: ORDER STATUS TRACKER */}
         {view === 'tracker' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 animate-fadeIn">
-            <OrderTracker orders={orders} />
+            <OrderTracker />
           </div>
         )}
 
@@ -705,6 +619,7 @@ export default function App() {
               onDeleteAllOrders={handleDeleteAllOrders}
               onAddOrder={handleNewOrder}
               onUpdateOrderCoords={handleUpdateOrderCoords}
+              onRefreshOrders={refreshStaffOrders}
             />
           </div>
         )}

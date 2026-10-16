@@ -79,7 +79,7 @@ export interface Order {
 export interface SystemUser {
   id: string; // Cédula/Identificación
   username: string; // Nombre de usuario (puede ser la misma cédula)
-  password: string; // Clave
+  password?: string; // Solo se usa en formularios; el servidor nunca la devuelve
   name: string; // Nombre completo
   phone: string; // Número de contacto
   email: string; // Correo electrónico

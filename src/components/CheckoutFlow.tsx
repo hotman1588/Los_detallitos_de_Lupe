@@ -9,7 +9,6 @@ import { DIVIPOLA_DATA } from '../divipola';
 import { Calendar, MapPin, Gift, CreditCard, ChevronRight, CheckCircle, ArrowLeft, Upload, Trash2 } from 'lucide-react';
 import MapPicker from './MapPicker';
 import { getProductDiscount, getProductEffectivePrice, compressImageBase64 } from '../lib/promoUtils';
-import { isSupabaseConfigured, getConfig, incrementIdCounter } from '../lib/supabaseClient';
 
 interface CheckoutFlowProps {
   cartItems: CartItem[];
@@ -17,7 +16,7 @@ interface CheckoutFlowProps {
   onUpdateQty: (productId: string, qty: number) => void;
   onRemoveItem: (productId: string) => void;
   onClearCart: () => void;
-  onSubmitOrder: (order: Order) => void;
+  onSubmitOrder: (order: Omit<Order, 'id'>) => Promise<{ id?: string; error?: string }>;
   onClose: () => void;
 }
 
@@ -32,6 +31,7 @@ export default function CheckoutFlow({
 }: CheckoutFlowProps) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1); // 1: Cart, 2: Shipping/Logistics, 3: Transfer & Receipt Upload, 4: Success Screen
   const [createdOrderID, setCreatedOrderID] = useState<string>('');
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
 
   // Delivery & Payment selection option states
@@ -354,23 +354,6 @@ export default function CheckoutFlow({
       return;
     }
 
-    // Generate Custom Order ID based on Admin choices
-    let idPrefix = 'LDL-';
-    let idCounter = 1;
-    if (isSupabaseConfigured) {
-      const dbPrefix = await getConfig('id_prefix', 'LDL-');
-      idPrefix = dbPrefix;
-      idCounter = await incrementIdCounter();
-    } else {
-      idPrefix = localStorage.getItem('dulce_amanecer_id_prefix') || 'LDL-';
-      const idCounterStr = localStorage.getItem('dulce_amanecer_id_counter') || '1';
-      idCounter = parseInt(idCounterStr, 10) || 1;
-      localStorage.setItem('dulce_amanecer_id_counter', String(idCounter + 1));
-    }
-    const formattedCounter = String(idCounter).padStart(5, '0');
-    const orderID = `${idPrefix}${formattedCounter}`;
-    setCreatedOrderID(orderID);
-
     const shipping: ShippingDetails = {
       buyerName,
       buyerPhone,
@@ -432,8 +415,7 @@ export default function CheckoutFlow({
       finalItems.push(...cartItems);
     }
 
-    const newOrder: Order = {
-      id: orderID,
+    const newOrder: Omit<Order, 'id'> = {
       shipping,
       items: finalItems,
       total,
@@ -444,7 +426,15 @@ export default function CheckoutFlow({
       createdAt: new Date().toISOString()
     };
 
-    onSubmitOrder(newOrder);
+    // El servidor asigna el número de orden y valida precios y comprobante.
+    setIsSubmittingOrder(true);
+    const { id, error } = await onSubmitOrder(newOrder);
+    setIsSubmittingOrder(false);
+    if (error || !id) {
+      setReceiptError(error || 'No se pudo registrar el pedido. Intenta de nuevo.');
+      return;
+    }
+    setCreatedOrderID(id);
     setStep(4);
   };
 
@@ -1684,9 +1674,10 @@ export default function CheckoutFlow({
                 <button
                   type="submit"
                   id="btn-confirm-checkout"
-                  className="bg-green-600 hover:bg-green-700 text-white font-semibold text-xs sm:text-sm px-5 sm:px-6 py-2.5 sm:py-3 rounded-full flex items-center justify-center gap-2 transform active:scale-95 transition w-full sm:w-auto"
+                  disabled={isSubmittingOrder}
+                  className="bg-green-600 hover:bg-green-700 disabled:opacity-60 disabled:cursor-wait text-white font-semibold text-xs sm:text-sm px-5 sm:px-6 py-2.5 sm:py-3 rounded-full flex items-center justify-center gap-2 transform active:scale-95 transition w-full sm:w-auto"
                 >
-                  Concluir y Enviar Pedido
+                  {isSubmittingOrder ? 'Registrando pedido…' : 'Concluir y Enviar Pedido'}
                   <CheckCircle size={14} className="sm:size-4" />
                 </button>
               </div>

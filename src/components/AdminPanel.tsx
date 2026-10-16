@@ -16,11 +16,14 @@ import MapPicker from './MapPicker';
 import {
   isSupabaseConfigured,
   getSystemUsers,
-  upsertSystemUser,
-  upsertSystemUserWithError,
+  saveSystemUser,
   deleteSystemUser,
-  getConfig,
-  saveConfig
+  getStaffConfig,
+  saveConfig,
+  staffLogin,
+  staffLogout,
+  staffRestoreSession,
+  getCachedStaffUser
 } from '../lib/supabaseClient';
 
 interface AdminPanelProps {
@@ -31,10 +34,11 @@ interface AdminPanelProps {
   onAddProduct: (product: Product) => void;
   onUpdateProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
-  onUpdateOrderStatus: (orderId: string, status: OrderStatus, deliveryPhotoUrl?: string, assignedDomiUsername?: string, assignedDomiInfo?: { name: string; phone: string }) => void;
+  onUpdateOrderStatus: (orderId: string, status: OrderStatus, deliveryPhotoUrl?: string, assignedDomiUsername?: string) => Promise<boolean>;
   onDeleteAllOrders: () => void;
-  onAddOrder?: (newOrder: Order) => void;
+  onAddOrder?: (newOrder: Omit<Order, 'id'>) => Promise<{ id?: string; error?: string }>;
   onUpdateOrderCoords?: (orderId: string, latlng: { lat: number; lng: number }, locationName?: string) => void;
+  onRefreshOrders: () => Promise<void>;
 }
 
 export default function AdminPanel({
@@ -48,25 +52,19 @@ export default function AdminPanel({
   onUpdateOrderStatus,
   onDeleteAllOrders,
   onAddOrder,
-  onUpdateOrderCoords
+  onUpdateOrderCoords,
+  onRefreshOrders
 }: AdminPanelProps) {
-  // Sesión persistida: mantiene el login del backoffice al recargar la página.
-  // Solo se borra al presionar "Cerrar Sesión".
-  const SESSION_KEY = 'dulce_amanecer_admin_session';
-  const savedSession: SystemUser | null = (() => {
-    try {
-      const raw = localStorage.getItem(SESSION_KEY);
-      return raw ? (JSON.parse(raw) as SystemUser) : null;
-    } catch {
-      return null;
-    }
-  })();
+  // Sesión persistida: guarda solo un token opaco que el servidor valida;
+  // vence a las 12 horas o al presionar "Cerrar Sesión".
+  const savedSession: SystemUser | null = getCachedStaffUser();
 
   const [isLoggedIn, setIsLoggedIn] = useState(!!savedSession);
   const [userRole, setUserRole] = useState<SystemUser['role'] | null>(savedSession?.role ?? null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const canUseAdminDashboard = userRole === 'admin' || userRole === 'supervisor';
   const canDeleteOrders = userRole === 'admin';
   const canSimulateOrders = userRole === 'admin';
@@ -152,115 +150,31 @@ export default function AdminPanel({
 
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
 
-  // Users State persistent in localStorage / Supabase
+  // Colaboradores: se consultan al servidor solo con una sesión válida.
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
-  const ADMIN_DEFAULT_PASSWORD = 'Allus2013.**';
 
-  React.useEffect(() => {
-    async function loadUsers() {
-      if (isSupabaseConfigured) {
-        const dbUsers = await getSystemUsers();
-        if (dbUsers === null) {
-          // La consulta falló (red o permisos). No se siembran los usuarios por
-          // defecto: hacerlo dejaría la lista incompleta y el siguiente guardado
-          // borraría de la base los usuarios reales que no están en pantalla.
-          console.error('[Usuarios] No se pudo leer system_users; se conserva la lista vacía.');
-          return;
-        }
-        if (dbUsers.length > 0) {
-          // Se respeta la contraseña almacenada en la base de datos (permite cambiarla).
-          setSystemUsers(dbUsers);
-        } else {
-          const defaults: SystemUser[] = [
-            {
-              id: '1016016370',
-              username: 'admin',
-              password: ADMIN_DEFAULT_PASSWORD,
-              name: 'Administrador Principal',
-              phone: '3138005702',
-              email: 'admin@detallitoslupe.com',
-              role: 'admin'
-            },
-            {
-              id: '1016016375',
-              username: 'domiciliario',
-              password: '1016016375',
-              name: 'Domiciliario 1',
-              phone: '3114445566',
-              email: 'domi1@detallitoslupe.com',
-              role: 'domiciliario'
-            }
-          ];
-          setSystemUsers(defaults);
-          for (const u of defaults) {
-            await upsertSystemUser(u);
-          }
-        }
-      } else {
-        const saved = localStorage.getItem('dulce_amanecer_system_users');
-        if (saved) {
-          try {
-            const savedUsers = JSON.parse(saved) as SystemUser[];
-            // Se respeta la contraseña guardada (permite cambiarla en este dispositivo).
-            setSystemUsers(savedUsers);
-            return;
-          } catch (e) {}
-        }
-        const defaults: SystemUser[] = [
-          {
-            id: '1016016370',
-            username: 'admin',
-            password: ADMIN_DEFAULT_PASSWORD,
-            name: 'Administrador Principal',
-            phone: '3138005702',
-            email: 'admin@detallitoslupe.com',
-            role: 'admin'
-          },
-          {
-            id: '1016016375',
-            username: 'domiciliario',
-            password: '1016016375',
-            name: 'Domiciliario 1',
-            phone: '3114445566',
-            email: 'domi1@detallitoslupe.com',
-            role: 'domiciliario'
-          }
-        ];
-        setSystemUsers(defaults);
-        localStorage.setItem('dulce_amanecer_system_users', JSON.stringify(defaults));
-      }
-    }
-    loadUsers();
-  }, []);
-
-  // Devuelve null si se guardó bien, o el mensaje de error para avisar al admin.
-  const saveSystemUsers = async (newUsers: SystemUser[]): Promise<string | null> => {
-    setSystemUsers(newUsers);
-    if (isSupabaseConfigured) {
-      const currentDbUsers = await getSystemUsers();
-      // Solo se borran usuarios si la lectura fue exitosa; si falló (null) no se
-      // toca nada, para no vaciar la tabla por un error temporal de conexión.
-      if (currentDbUsers) {
-        const toDelete = currentDbUsers.filter(dbU => !newUsers.some(u => u.id === dbU.id));
-        for (const u of toDelete) {
-          await deleteSystemUser(u.id);
-        }
-      }
-      for (const u of newUsers) {
-        const err = await upsertSystemUserWithError(u);
-        if (err) return err;
-      }
-      return null;
-    }
-    try {
-      localStorage.setItem('dulce_amanecer_system_users', JSON.stringify(newUsers));
-      return null;
-    } catch (e: any) {
-      return e?.message || 'No se pudo guardar en el almacenamiento local del navegador.';
-    }
+  const loadUsers = async () => {
+    const dbUsers = await getSystemUsers();
+    if (dbUsers) setSystemUsers(dbUsers);
   };
 
   const [currentUser, setCurrentUser] = useState<SystemUser | null>(savedSession);
+
+  // Al abrir el portal se confirma con el servidor que la sesión guardada sigue vigente.
+  React.useEffect(() => {
+    if (!savedSession) return;
+    (async () => {
+      const user = await staffRestoreSession();
+      if (!user) {
+        handleLogout();
+        setLoginError('Tu sesión venció. Ingresa de nuevo.');
+        return;
+      }
+      setCurrentUser(user);
+      setUserRole(user.role);
+      await Promise.all([onRefreshOrders(), loadUsers()]);
+    })();
+  }, []);
 
   // Tab State
   const [activeTab, setActiveTab] = useState<'orders' | 'inventory' | 'users'>('orders');
@@ -305,12 +219,10 @@ export default function AdminPanel({
 
   React.useEffect(() => {
     async function loadConfig() {
-      if (isSupabaseConfigured) {
-        const prefix = await getConfig('id_prefix', 'LDL-');
-        const counter = await getConfig('id_counter', '1');
-        setAdminIdPrefix(prefix);
-        setAdminIdCounter(String(counter));
-      }
+      const prefix = await getStaffConfig('id_prefix', 'LDL-');
+      const counter = await getStaffConfig('id_counter', '1');
+      setAdminIdPrefix(prefix);
+      setAdminIdCounter(String(counter));
     }
     if (isLoggedIn && canUseAdminDashboard) {
       loadConfig();
@@ -470,12 +382,10 @@ export default function AdminPanel({
       return;
     }
     const cleanPrefix = adminIdPrefix.toUpperCase().trim();
-    if (isSupabaseConfigured) {
-      await saveConfig('id_prefix', cleanPrefix);
-      await saveConfig('id_counter', parsedCounter);
-    } else {
-      localStorage.setItem('dulce_amanecer_id_prefix', cleanPrefix);
-      localStorage.setItem('dulce_amanecer_id_counter', String(parsedCounter));
+    const configError = (await saveConfig('id_prefix', cleanPrefix)) || (await saveConfig('id_counter', parsedCounter));
+    if (configError) {
+      alert(`No se guardó la configuración:\n\n${configError}`);
+      return;
     }
     setShowIdConfigMsg(true);
     setTimeout(() => {
@@ -486,92 +396,14 @@ export default function AdminPanel({
   // Helper SQL schema generator for Supabase
   const getSupabaseSqlSchema = () => {
     return `-- =======================================================
--- SCRIPT DE CREACIÓN DE TABLAS EN POSTGRESQL / SUPABASE
--- Copia y ejecuta este script en la pestaña SQL EDITOR de Supabase
+-- El esquema y las reglas de seguridad de la base de datos se
+-- administran con las migraciones del repositorio:
+--   supabase/migrations/
+-- Aplicar con:  supabase db push --linked
+--
+-- No crees políticas que permitan escribir a usuarios anónimos:
+-- toda modificación pasa por funciones que validan la sesión.
 -- =======================================================
-
--- 1. Tabla de Productos/Catálogo
-CREATE TABLE IF NOT EXISTS catalogo_productos (
-    id VARCHAR(50) PRIMARY KEY,
-    name VARCHAR(150) NOT NULL,
-    price INTEGER NOT NULL,
-    category VARCHAR(60) NOT NULL,
-    image TEXT NOT NULL,
-    description TEXT,
-    featured BOOLEAN DEFAULT FALSE,
-    discount_percentage INTEGER DEFAULT 0
-);
-
-ALTER TABLE catalogo_productos ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Permitir lectura publica de productos" ON catalogo_productos
-    FOR SELECT USING (true);
-
-CREATE POLICY "Permitir gestion total anonima de productos" ON catalogo_productos
-    FOR ALL USING (true) WITH CHECK (true);
-
--- 2. Tabla de Pedidos/Ordenes
-CREATE TABLE IF NOT EXISTS pedidos (
-    id VARCHAR(50) PRIMARY KEY,
-    shipping JSONB NOT NULL,
-    items JSONB NOT NULL,
-    total INTEGER NOT NULL,
-    subtotal INTEGER,
-    shipping_fee INTEGER,
-    payment_receipt_url TEXT,
-    status VARCHAR(60) NOT NULL DEFAULT 'En Validación',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    delivery_photo_url TEXT,
-    delivered_at TIMESTAMP WITH TIME ZONE,
-    payment_method VARCHAR(120),
-    assigned_domi_username VARCHAR(120)
-);
-
-ALTER TABLE pedidos ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Permitir lectura de pedidos anonima" ON pedidos
-    FOR SELECT USING (true);
-
-CREATE POLICY "Permitir creacion y modificacion anonima de pedidos" ON pedidos
-    FOR ALL USING (true) WITH CHECK (true);
-
--- 3. Tabla de Usuarios del Sistema (Backoffice)
-CREATE TABLE IF NOT EXISTS system_users (
-    id VARCHAR(50) PRIMARY KEY,
-    username VARCHAR(100) UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    name VARCHAR(150) NOT NULL,
-    phone VARCHAR(50),
-    email VARCHAR(150),
-    role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'supervisor', 'domiciliario'))
-);
-
-ALTER TABLE system_users DROP CONSTRAINT IF EXISTS system_users_role_check;
-ALTER TABLE system_users
-    ADD CONSTRAINT system_users_role_check
-    CHECK (role IN ('admin', 'supervisor', 'domiciliario'));
-
-ALTER TABLE system_users ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Permitir lectura de usuarios para autenticacion" ON system_users
-    FOR SELECT USING (true);
-
-CREATE POLICY "Permitir gestion de usuarios anonima" ON system_users
-    FOR ALL USING (true) WITH CHECK (true);
-
--- 4. Tabla de Configuración de Negocio (Descuentos de categorías, prefijo, contador)
-CREATE TABLE IF NOT EXISTS configuracion (
-    key VARCHAR(100) PRIMARY KEY,
-    value JSONB NOT NULL
-);
-
-ALTER TABLE configuracion ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Permitir lectura de configuraciones" ON configuracion
-    FOR SELECT USING (true);
-
-CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
-    FOR ALL USING (true) WITH CHECK (true);
 `;
   };
 
@@ -674,21 +506,21 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
     document.body.removeChild(link);
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const normalizedUser = username.toLowerCase().trim();
-    const foundUser = systemUsers.find(
-      u => u.username.toLowerCase().trim() === normalizedUser && u.password === password
-    );
+    setIsLoggingIn(true);
+    const { user, error } = await staffLogin(username, password);
+    setIsLoggingIn(false);
+    setPassword('');
 
-    if (foundUser) {
+    if (user) {
       setIsLoggedIn(true);
-      setUserRole(foundUser.role);
-      setCurrentUser(foundUser);
+      setUserRole(user.role);
+      setCurrentUser(user);
       setLoginError('');
-      try { localStorage.setItem(SESSION_KEY, JSON.stringify(foundUser)); } catch {}
+      await Promise.all([onRefreshOrders(), loadUsers()]);
     } else {
-      setLoginError('Usuario o contraseña incorrectos.');
+      setLoginError(error || 'Usuario o contraseña incorrectos.');
     }
   };
 
@@ -704,7 +536,8 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
     setCurrentUser(null);
     setUsername('');
     setPassword('');
-    try { localStorage.removeItem(SESSION_KEY); } catch {}
+    setSystemUsers([]);
+    staffLogout();
     if (liveStream) {
       stopCameraStreamForced(liveStream);
       setLiveStream(null);
@@ -715,8 +548,12 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
   // User management handler functions
   const handleCreateUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUserCedula.trim() || !newUserName.trim() || !newUserPhone.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
+    if (!newUserCedula.trim() || !newUserName.trim() || !newUserPhone.trim() || !newUserEmail.trim() || (!editingUser && !newUserPassword.trim())) {
       alert("Por favor completa todos los campos requeridos.");
+      return;
+    }
+    if (newUserPassword && newUserPassword.length < 8) {
+      alert("La contraseña debe tener al menos 8 caracteres.");
       return;
     }
     const usernameVal = newUserUsername.trim() || newUserCedula.trim();
@@ -726,60 +563,26 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
       return;
     }
 
-    if (editingUser) {
-      // Check duplicate
-      const duplicate = systemUsers.some(u => u.id !== editingUser.id && (u.username.toLowerCase() === usernameVal.toLowerCase() || u.id === newUserCedula.trim()));
-      if (duplicate) {
-        alert(`El usuario con cédula o usuario "${usernameVal}" ya se encuentra registrado por otro colaborador.`);
-        return;
-      }
+    const userData: SystemUser = {
+      id: newUserCedula.trim(),
+      username: usernameVal,
+      name: newUserName.trim(),
+      phone: newUserPhone.trim(),
+      email: newUserEmail.trim(),
+      role: newUserRole
+    };
 
-      const updated = systemUsers.map(u => 
-        u.id === editingUser.id ? {
-          ...u,
-          id: newUserCedula.trim(),
-          username: usernameVal,
-          password: newUserPassword,
-          name: newUserName.trim(),
-          phone: newUserPhone.trim(),
-          email: newUserEmail.trim(),
-          role: newUserRole
-        } : u
-      );
-      const saveError = await saveSystemUsers(updated);
-      if (saveError) {
-        alert(`No se pudo actualizar el usuario en la base de datos:\n\n${saveError}`);
-        return;
-      }
-      alert(`¡Usuario "${newUserName.trim()}" actualizado con éxito!`);
-    } else {
-      // Check duplicate
-      const duplicate = systemUsers.some(u => u.username.toLowerCase() === usernameVal.toLowerCase() || u.id === newUserCedula.trim());
-      if (duplicate) {
-        alert(`El usuario con cédula o usuario "${usernameVal}" ya se encuentra registrado.`);
-        return;
-      }
-
-      const newUser: SystemUser = {
-        id: newUserCedula.trim(),
-        username: usernameVal,
-        password: newUserPassword,
-        name: newUserName.trim(),
-        phone: newUserPhone.trim(),
-        email: newUserEmail.trim(),
-        role: newUserRole
-      };
-
-      const saveError = await saveSystemUsers([...systemUsers, newUser]);
-      if (saveError) {
-        // Se revierte el estado local para no mostrar un usuario que no quedó guardado.
-        setSystemUsers(systemUsers);
-        alert(`No se pudo registrar el usuario en la base de datos:\n\n${saveError}`);
-        return;
-      }
-      alert(`¡Usuario "${newUser.name}" registrado con éxito!`);
+    // El servidor valida permisos, duplicados y guarda la contraseña cifrada.
+    const saveError = await saveSystemUser(editingUser ? editingUser.id : null, userData, newUserPassword);
+    if (saveError) {
+      alert(`No se pudo guardar el usuario:\n\n${saveError}`);
+      return;
     }
-    
+    await loadUsers();
+    alert(editingUser
+      ? `¡Usuario "${userData.name}" actualizado con éxito!`
+      : `¡Usuario "${userData.name}" registrado con éxito!`);
+
     // reset form fields
     setNewUserCedula('');
     setNewUserUsername('');
@@ -792,18 +595,22 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
     setShowUserModal(false);
   };
 
-  const handleChangePasswordSubmit = (e: React.FormEvent) => {
+  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPasswordValue.trim() || !changingPasswordUser) {
       alert("Por favor ingresa una contraseña válida.");
       return;
     }
+    if (newPasswordValue.trim().length < 8) {
+      alert("La contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
 
-    const updated = systemUsers.map(u => 
-      u.id === changingPasswordUser.id ? { ...u, password: newPasswordValue.trim() } : u
-    );
-
-    saveSystemUsers(updated);
+    const saveError = await saveSystemUser(changingPasswordUser.id, changingPasswordUser, newPasswordValue.trim());
+    if (saveError) {
+      alert(`No se pudo cambiar la contraseña:\n\n${saveError}`);
+      return;
+    }
     alert(`Contraseña del usuario "${changingPasswordUser.name}" actualizada con éxito.`);
     setChangingPasswordUser(null);
     setNewPasswordValue('');
@@ -970,9 +777,10 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
           <button
             type="submit"
             id="admin-login-submit"
-            className="w-full bg-sage-primary hover:bg-earth-brown text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-sm cursor-pointer"
+            disabled={isLoggingIn}
+            className="w-full bg-sage-primary hover:bg-earth-brown disabled:opacity-60 disabled:cursor-wait text-white font-semibold py-2.5 rounded-xl text-sm transition shadow-sm cursor-pointer"
           >
-            Ingresar al Sistema
+            {isLoggingIn ? 'Verificando…' : 'Ingresar al Sistema'}
           </button>
 
           {/* Indicador de conexión: permite validar desde cualquier dispositivo
@@ -1741,12 +1549,15 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          const fileBase64 = uploadingPhotos[domiClosingOrder.id];
-                          onUpdateOrderStatus(domiClosingOrder.id, 'Entregado', fileBase64);
+                        onClick={async () => {
+                          const closingId = domiClosingOrder.id;
+                          const fileBase64 = uploadingPhotos[closingId];
                           setDomiClosingOrder(null);
                           setDomiCloseConfirmationRequired(false);
-                          alert(`✅ ¡Excelente! El pedido ${domiClosingOrder.id} ha sido entregado satisfactoriamente.`);
+                          const ok = await onUpdateOrderStatus(closingId, 'Entregado', fileBase64);
+                          if (ok) {
+                            alert(`✅ ¡Excelente! El pedido ${closingId} ha sido entregado satisfactoriamente.`);
+                          }
                         }}
                         className="bg-green-700 hover:bg-green-800 text-white font-extrabold text-[10px] px-3 py-1.5 rounded-lg cursor-pointer shadow-xs"
                       >
@@ -1887,7 +1698,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
           )}
           {onAddOrder && canSimulateOrders && (
             <button
-              onClick={() => {
+              onClick={async () => {
                 const randomIdNum = Math.floor(10000 + Math.random() * 90000);
                 const mockOrder: Order = {
                   id: `${adminIdPrefix || 'LDL-'}${randomIdNum}`,
@@ -1917,7 +1728,14 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
                   status: "En Validación",
                   createdAt: new Date().toISOString()
                 };
-                onAddOrder(mockOrder);
+                const { id: _mockId, ...mockData } = mockOrder;
+                const { id: createdId, error: createError } = await onAddOrder(mockData);
+                if (createError) {
+                  alert(`No se pudo simular el pedido:\n\n${createError}`);
+                  return;
+                }
+                await onRefreshOrders();
+                alert(`Pedido de prueba ${createdId} creado.`);
               }}
               className="bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1.5 transition cursor-pointer shadow-sm border border-amber-400"
             >
@@ -2392,7 +2210,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
                                           const selectedVal = e.target.value;
                                           const nextStatus = order.status === 'En Validación' || order.status === 'En Preparación' || order.status === 'En Vali' ? 'En Reparto' : order.status;
                                           const selectedDomi = systemUsers.find(u => u.username === selectedVal);
-                                          onUpdateOrderStatus(order.id, nextStatus, undefined, selectedVal, selectedDomi ? { name: selectedDomi.name, phone: selectedDomi.phone } : undefined);
+                                          onUpdateOrderStatus(order.id, nextStatus, undefined, selectedVal);
                                           const label = selectedDomi?.name || 'Ninguno';
                                           alert(`Asignado con éxito a ${label}.`);
                                         }}
@@ -2710,7 +2528,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
                                   const selectedVal = e.target.value;
                                   const nextStatus = order.status === 'En Validación' || order.status === 'En Preparación' || order.status === 'En Vali' ? 'En Reparto' : order.status;
                                   const selectedDomi = systemUsers.find(u => u.username === selectedVal);
-                                  onUpdateOrderStatus(order.id, nextStatus, undefined, selectedVal, selectedDomi ? { name: selectedDomi.name, phone: selectedDomi.phone } : undefined);
+                                  onUpdateOrderStatus(order.id, nextStatus, undefined, selectedVal);
                                   const label = selectedDomi?.name || 'Ninguno';
                                   alert(`Asignado con éxito a ${label}.`);
                                 }}
@@ -3042,7 +2860,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
                               setEditingUser(user);
                               setNewUserCedula(user.id);
                               setNewUserUsername(user.username);
-                              setNewUserPassword(user.password);
+                              setNewUserPassword('');
                               setNewUserName(user.name);
                               setNewUserPhone(user.phone);
                               setNewUserEmail(user.email);
@@ -3062,7 +2880,7 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
                                 return;
                               }
                               setChangingPasswordUser(user);
-                              setNewPasswordValue(user.password);
+                              setNewPasswordValue('');
                             }}
                             className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold px-3 py-1.5 rounded-lg border border-indigo-100 transition cursor-pointer"
                             title="Actualizar Clave"
@@ -3638,10 +3456,14 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  const updated = systemUsers.filter(u => u.id !== deletingUser.id);
-                  saveSystemUsers(updated);
+                onClick={async () => {
+                  const deleteError = await deleteSystemUser(deletingUser.id);
                   setDeletingUser(null);
+                  if (deleteError) {
+                    alert(`No se pudo eliminar el colaborador:\n\n${deleteError}`);
+                    return;
+                  }
+                  await loadUsers();
                   alert("✅ Colaborador eliminado correctamente.");
                 }}
                 className="bg-[#8C0428] hover:bg-[#590212] text-white text-xs font-bold px-4 py-2 rounded-xl transition cursor-pointer shadow-xs"
@@ -3773,13 +3595,15 @@ CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">{editingUser ? 'Contraseña de Acceso *' : 'Contraseña Inicial Otorgada *'}</label>
+                  <label className="block font-bold text-slate-700 mb-1">{editingUser ? 'Nueva Contraseña (opcional)' : 'Contraseña Inicial Otorgada *'}</label>
                   <input
                     type="password"
-                    required
+                    required={!editingUser}
+                    minLength={8}
+                    autoComplete="new-password"
                     value={newUserPassword}
                     onChange={(e) => setNewUserPassword(e.target.value)}
-                    placeholder="Fija una contraseña de seguridad"
+                    placeholder={editingUser ? 'Déjala vacía para conservar la actual' : 'Mínimo 8 caracteres'}
                     className="w-full bg-slate-55/40 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-sage-primary text-slate-800"
                   />
                 </div>

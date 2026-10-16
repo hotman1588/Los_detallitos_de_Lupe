@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Product, Order, SystemUser } from '../types';
+import { Product, Order, OrderStatus, SystemUser } from '../types';
 
 // Limpia el valor de variables de entorno: quita espacios, saltos de línea,
 // comillas envolventes y barras finales que suelen colarse al pegar en Vercel.
@@ -25,21 +25,13 @@ const hasValidSupabaseAnonKey = Boolean(
   supabaseAnonKey !== 'your-anon-public-key'
 );
 
-// Diagnóstico en consola del navegador (no expone la clave completa).
-if (typeof window !== 'undefined') {
-  console.info(
-    '[Supabase] configurado:', hasValidSupabaseUrl && hasValidSupabaseAnonKey,
-    '| URL detectada:', supabaseUrl || '(vacía)',
-    '| URL válida:', hasValidSupabaseUrl,
-    '| ANON key presente:', hasValidSupabaseAnonKey
-  );
-}
-
 export const isSupabaseConfigured = hasValidSupabaseUrl && hasValidSupabaseAnonKey;
 
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
+
+const NOT_CONFIGURED = 'El servicio no está disponible en este momento. Intenta más tarde.';
 
 // Helper to map DB Product to Client Product
 function mapProductFromDb(dbProd: any): Product {
@@ -88,23 +80,83 @@ function mapOrderFromDb(dbOrder: any): Order {
   };
 }
 
-// Helper to map Client Order to DB Order
-function mapOrderToDb(order: Order) {
-  return {
-    id: order.id,
-    shipping: order.shipping,
-    items: order.items,
-    total: order.total,
-    subtotal: order.subtotal || null,
-    shipping_fee: order.shippingFee || null,
-    payment_receipt_url: order.paymentReceiptUrl,
-    status: order.status,
-    created_at: order.createdAt,
-    delivery_photo_url: order.deliveryPhotoUrl || null,
-    delivered_at: order.deliveredAt || null,
-    payment_method: order.paymentMethod || null,
-    assigned_domi_username: order.assignedDomiUsername || null
-  };
+// Llama a una función RPC y devuelve { data } o { error } con un mensaje apto para el usuario.
+async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<{ data?: T; error?: string }> {
+  if (!supabase) return { error: NOT_CONFIGURED };
+  const { data, error } = await supabase.rpc(fn, args);
+  if (error) {
+    console.error(`[Supabase] ${fn}:`, error.message);
+    // Sesión vencida o revocada: se descarta para obligar a ingresar de nuevo.
+    if (error.code === '28000') clearStaffSession();
+    return { error: error.message || 'Ocurrió un error inesperado.' };
+  }
+  return { data: data as T };
+}
+
+// === SESIÓN DEL PORTAL ===
+// Solo se guarda el token opaco y los datos públicos del usuario (nunca la contraseña).
+const SESSION_KEY = 'ldl_staff_session';
+
+interface StoredSession {
+  token: string;
+  expiresAt: string;
+  user: SystemUser;
+}
+
+function readStaffSession(): StoredSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const session = JSON.parse(raw) as StoredSession;
+    if (!session.token || new Date(session.expiresAt).getTime() <= Date.now()) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+function staffToken(): string {
+  return readStaffSession()?.token || '';
+}
+
+export function clearStaffSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch {}
+}
+
+export function getCachedStaffUser(): SystemUser | null {
+  return readStaffSession()?.user || null;
+}
+
+export async function staffLogin(username: string, password: string): Promise<{ user?: SystemUser; error?: string }> {
+  const { data, error } = await rpc<any>('staff_login', { p_username: username, p_password: password });
+  if (error) return { error };
+  if (!data || data.error) return { error: data?.error || 'Usuario o contraseña incorrectos.' };
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ token: data.token, expiresAt: data.expires_at, user: data.user }));
+  } catch {}
+  return { user: data.user as SystemUser };
+}
+
+// Confirma con el servidor que la sesión guardada sigue vigente.
+export async function staffRestoreSession(): Promise<SystemUser | null> {
+  const session = readStaffSession();
+  if (!session) return null;
+  const { data, error } = await rpc<SystemUser>('staff_session', { p_token: session.token });
+  if (error || !data) {
+    clearStaffSession();
+    return null;
+  }
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify({ ...session, user: data })); } catch {}
+  return data;
+}
+
+export async function staffLogout(): Promise<void> {
+  const token = staffToken();
+  clearStaffSession();
+  if (token) await rpc('staff_logout', { p_token: token });
 }
 
 // === DATABASE OPERATIONS ===
@@ -116,7 +168,7 @@ export async function getProducts(): Promise<Product[] | null> {
     .from('catalogo_productos')
     .select('*')
     .order('name', { ascending: true });
-  
+
   if (error) {
     console.error('Error fetching products from Supabase:', error);
     return null;
@@ -124,199 +176,117 @@ export async function getProducts(): Promise<Product[] | null> {
   return (data || []).map(mapProductFromDb);
 }
 
-export async function upsertProduct(product: Product): Promise<boolean> {
-  if (!supabase) return false;
-  const dbProd = mapProductToDb(product);
-  const { error } = await supabase
-    .from('catalogo_productos')
-    .upsert(dbProd);
-
-  if (error) {
-    console.error('Error saving product to Supabase:', error);
-    return false;
-  }
-  return true;
+// Devuelve null si se guardó, o el mensaje de error.
+export async function saveProduct(product: Product): Promise<string | null> {
+  const { error } = await rpc('staff_save_product', { p_token: staffToken(), p_product: mapProductToDb(product) });
+  return error || null;
 }
 
-export async function deleteProduct(id: string): Promise<boolean> {
-  if (!supabase) return false;
-  const { error } = await supabase
-    .from('catalogo_productos')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-    console.error('Error deleting product from Supabase:', error);
-    return false;
-  }
-  return true;
+export async function removeProduct(id: string): Promise<string | null> {
+  const { error } = await rpc('staff_delete_product', { p_token: staffToken(), p_id: id });
+  return error || null;
 }
 
 // 2. ORDERS
-export async function getOrders(): Promise<Order[] | null> {
-  if (!supabase) return null;
-  const { data, error } = await supabase
-    .from('pedidos')
-    .select('*')
-    .order('created_at', { ascending: false });
+// El servidor asigna el número de orden y recalcula los precios con el catálogo.
+export async function createOrder(order: Omit<Order, 'id'>): Promise<{ id?: string; error?: string }> {
+  const { data, error } = await rpc<{ id: string }>('create_order', { p_order: order });
+  if (error) return { error };
+  return { id: data?.id };
+}
 
-  if (error) {
-    console.error('Error fetching orders from Supabase:', error);
-    return null;
-  }
+export async function trackOrder(id: string, cedula: string): Promise<{ order?: Order | null; error?: string }> {
+  const { data, error } = await rpc<any>('track_order', { p_id: id, p_cedula: cedula });
+  if (error) return { error };
+  return { order: data ? mapOrderFromDb(data) : null };
+}
+
+export async function getStaffOrders(): Promise<Order[] | null> {
+  const { data, error } = await rpc<any[]>('staff_list_orders', { p_token: staffToken() });
+  if (error) return null;
   return (data || []).map(mapOrderFromDb);
 }
 
-export async function upsertOrder(order: Order): Promise<boolean> {
-  if (!supabase) return false;
-  const dbOrder = mapOrderToDb(order);
-  const { error } = await supabase
-    .from('pedidos')
-    .upsert(dbOrder);
-
-  if (error) {
-    console.error('Error saving order to Supabase:', error);
-    return false;
-  }
-  return true;
+// domiUsername: undefined = no cambiar, '' = quitar asignación.
+export async function updateOrderStatus(
+  id: string,
+  status: OrderStatus,
+  deliveryPhotoUrl?: string,
+  domiUsername?: string
+): Promise<{ order?: Order; error?: string }> {
+  const { data, error } = await rpc<any>('staff_update_order', {
+    p_token: staffToken(),
+    p_id: id,
+    p_status: status,
+    p_delivery_photo: deliveryPhotoUrl ?? null,
+    p_domi_username: domiUsername ?? null
+  });
+  if (error) return { error };
+  return { order: mapOrderFromDb(data) };
 }
 
-export async function deleteOrder(id: string): Promise<boolean> {
-  if (!supabase) return false;
-  const { error } = await supabase
-    .from('pedidos')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-    console.error('Error deleting order from Supabase:', error);
-    return false;
-  }
-  return true;
+export async function updateOrderCoords(id: string, lat: number, lng: number): Promise<{ order?: Order; error?: string }> {
+  const { data, error } = await rpc<any>('staff_update_order_coords', { p_token: staffToken(), p_id: id, p_lat: lat, p_lng: lng });
+  if (error) return { error };
+  return { order: mapOrderFromDb(data) };
 }
 
-export async function deleteAllOrders(): Promise<boolean> {
-  if (!supabase) return false;
-  const { error } = await supabase
-    .from('pedidos')
-    .delete()
-    .neq('id', 'placeholder_non_existent');
-
-  if (error) {
-    console.error('Error deleting all orders from Supabase:', error);
-    return false;
-  }
-  return true;
+// Elimina los pedidos no entregados; los entregados se conservan siempre.
+export async function deleteOpenOrders(): Promise<{ count?: number; error?: string }> {
+  const { data, error } = await rpc<number>('staff_delete_orders', { p_token: staffToken() });
+  if (error) return { error };
+  return { count: data ?? 0 };
 }
 
 // 3. USERS
 export async function getSystemUsers(): Promise<SystemUser[] | null> {
-  if (!supabase) return null;
-  const { data, error } = await supabase
-    .from('system_users')
-    .select('*');
-
-  if (error) {
-    console.error('Error fetching system users from Supabase:', error);
-    return null;
-  }
+  const { data, error } = await rpc<SystemUser[]>('staff_list_users', { p_token: staffToken() });
+  if (error) return null;
   return data || [];
 }
 
+// originalId null = crear. password vacío al editar = conservar la actual.
 // Devuelve null si todo salió bien, o el mensaje de error para mostrarlo al usuario.
-export async function upsertSystemUserWithError(user: SystemUser): Promise<string | null> {
-  if (!supabase) return 'Supabase no está configurado.';
-  const { error } = await supabase
-    .from('system_users')
-    .upsert(user, { onConflict: 'id' });
-
-  if (error) {
-    console.error('Error saving system user to Supabase:', error);
-    return error.message || 'Error desconocido al guardar el usuario.';
-  }
-  return null;
+export async function saveSystemUser(originalId: string | null, user: SystemUser, password: string): Promise<string | null> {
+  const { password: _omit, ...publicUser } = user;
+  const { error } = await rpc('staff_save_user', {
+    p_token: staffToken(),
+    p_original_id: originalId,
+    p_user: publicUser,
+    p_password: password || null
+  });
+  return error || null;
 }
 
-export async function upsertSystemUser(user: SystemUser): Promise<boolean> {
-  return (await upsertSystemUserWithError(user)) === null;
-}
-
-export async function deleteSystemUser(id: string): Promise<boolean> {
-  if (!supabase) return false;
-  const { error } = await supabase
-    .from('system_users')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-    console.error('Error deleting system user from Supabase:', error);
-    return false;
-  }
-  return true;
+export async function deleteSystemUser(id: string): Promise<string | null> {
+  const { error } = await rpc('staff_delete_user', { p_token: staffToken(), p_id: id });
+  return error || null;
 }
 
 // 4. CONFIGURATION (Discounts, ID Prefix, ID Counter)
+// Lectura pública: solo 'category_discounts' e 'id_prefix'.
 export async function getConfig(key: string, defaultValue: any): Promise<any> {
   if (!supabase) return defaultValue;
   const { data, error } = await supabase
     .from('configuracion')
     .select('value')
     .eq('key', key)
-    .single();
+    .maybeSingle();
 
-  if (error) {
-    if (error.code === 'PGRST116') {
-      await saveConfig(key, defaultValue);
-      return defaultValue;
-    }
-    console.error(`Error getting config for ${key}:`, error);
+  if (error || !data) {
+    if (error) console.error(`Error getting config for ${key}:`, error);
     return defaultValue;
   }
-  return data?.value;
+  return data.value;
 }
 
-export async function saveConfig(key: string, value: any): Promise<boolean> {
-  if (!supabase) return false;
-  const { error } = await supabase
-    .from('configuracion')
-    .upsert({ key, value });
-
-  if (error) {
-    console.error(`Error saving config for ${key}:`, error);
-    return false;
-  }
-  return true;
+export async function getStaffConfig(key: string, defaultValue: any): Promise<any> {
+  const { data, error } = await rpc<any>('staff_get_config', { p_token: staffToken(), p_key: key });
+  if (error || data === null || data === undefined) return defaultValue;
+  return data;
 }
 
-// Helper to increment order ID counter safely in Supabase
-export async function incrementIdCounter(): Promise<number> {
-  if (!supabase) {
-    const counterStr = localStorage.getItem('dulce_amanecer_id_counter') || '1';
-    const counter = parseInt(counterStr, 10) || 1;
-    localStorage.setItem('dulce_amanecer_id_counter', String(counter + 1));
-    return counter;
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('configuracion')
-      .select('value')
-      .eq('key', 'id_counter')
-      .single();
-
-    let currentCounter = 1;
-    if (!error && data) {
-      currentCounter = parseInt(data.value, 10) || 1;
-    }
-
-    const nextCounter = currentCounter + 1;
-    await supabase
-      .from('configuracion')
-      .upsert({ key: 'id_counter', value: nextCounter });
-
-    return currentCounter;
-  } catch (e) {
-    console.error('Error incrementing ID counter in Supabase:', e);
-    return 1;
-  }
+export async function saveConfig(key: string, value: any): Promise<string | null> {
+  const { error } = await rpc('staff_save_config', { p_token: staffToken(), p_key: key, p_value: value });
+  return error || null;
 }

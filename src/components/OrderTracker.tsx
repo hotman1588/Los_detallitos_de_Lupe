@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Order, OrderStatus, SystemUser } from '../types';
+import { Order, OrderStatus } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { isSupabaseConfigured, getSystemUsers } from '../lib/supabaseClient';
+import { trackOrder } from '../lib/supabaseClient';
 import {
   Search, ClipboardList, CheckCircle2, Truck, ClipboardCheck,
   Calendar, Clock, User, AlertCircle, FileText, Camera,
@@ -9,11 +9,7 @@ import {
   Phone, MessageCircle, BadgeCheck
 } from 'lucide-react';
 
-interface OrderTrackerProps {
-  orders: Order[];
-}
-
-export default function OrderTracker({ orders }: OrderTrackerProps) {
+export default function OrderTracker() {
   const [orderId, setOrderId] = useState('LDL-');
   const [cedula, setCedula] = useState('');
   const [searched, setSearched] = useState(false);
@@ -21,75 +17,41 @@ export default function OrderTracker({ orders }: OrderTrackerProps) {
   const [foundOrder, setFoundOrder] = useState<Order | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [activeTab, setActiveTab] = useState<'status' | 'logistics'>('status');
-  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
 
-  // Carga los usuarios del sistema para poder mostrar los datos del domiciliario asignado.
-  React.useEffect(() => {
-    async function loadUsers() {
-      if (isSupabaseConfigured) {
-        const dbUsers = await getSystemUsers();
-        if (dbUsers && dbUsers.length > 0) {
-          setSystemUsers(dbUsers);
-          return;
-        }
-      }
-      const saved = localStorage.getItem('dulce_amanecer_system_users');
-      if (saved) {
-        try {
-          setSystemUsers(JSON.parse(saved) as SystemUser[]);
-        } catch (e) {}
-      }
-    }
-    loadUsers();
-  }, []);
-
-  const assignedDomi = foundOrder?.assignedDomiUsername
-    ? systemUsers.find(u => u.username === foundOrder.assignedDomiUsername) || null
-    : null;
-
-  // Prioriza la ficha del usuario; si el visitante no tiene cargada la lista de
-  // usuarios, usa el nombre/teléfono copiados en el pedido al asignar el domicilio.
-  const domiName =
-    assignedDomi?.name ||
-    foundOrder?.shipping.assignedDomiName ||
-    foundOrder?.assignedDomiUsername ||
-    '';
-  const domiPhone = assignedDomi?.phone || foundOrder?.shipping.assignedDomiPhone || '';
+  // Nombre y teléfono del domiciliario copiados en el pedido al asignarlo.
+  const domiName = foundOrder?.shipping.assignedDomiName || foundOrder?.assignedDomiUsername || '';
+  const domiPhone = foundOrder?.shipping.assignedDomiPhone || '';
 
   const onlyDigits = (phone?: string) => (phone || '').replace(/\D/g, '');
   const waLink = (phone: string | undefined, ref: string) =>
     `https://wa.me/57${onlyDigits(phone)}?text=${encodeURIComponent(`Hola, consulto por mi pedido ${ref} de Los Detallitos de Lupe.`)}`;
 
-  const handleTrackSubmit = (e: React.FormEvent) => {
+  const handleTrackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSearching(true);
     setErrorMsg('');
+    setFoundOrder(null);
 
-    // Simulate search duration for immersive full-stack feel
-    setTimeout(() => {
+    const trimmedId = orderId.trim().toUpperCase();
+    const trimmedCedula = cedula.trim();
+
+    if (!trimmedId || !trimmedCedula) {
       setSearched(true);
-      setIsSearching(false);
-      setFoundOrder(null);
+      setErrorMsg('Por favor ingresa tanto el Número de Orden como tu Número de Cédula.');
+      return;
+    }
 
-      const trimmedId = orderId.trim().toUpperCase();
-      const trimmedCedula = cedula.trim();
+    setIsSearching(true);
+    const { order, error } = await trackOrder(trimmedId, trimmedCedula);
+    setIsSearching(false);
+    setSearched(true);
 
-      if (!trimmedId || !trimmedCedula) {
-        setErrorMsg('Por favor ingresa tanto el Número de Orden como tu Número de Cédula.');
-        return;
-      }
-
-      const match = orders.find(o => 
-        o.id.toUpperCase() === trimmedId && 
-        o.shipping.buyerCedula?.trim() === trimmedCedula
-      );
-
-      if (match) {
-        setFoundOrder(match);
-      } else {
-        setErrorMsg('⚠️ No se encontró ningún pedido que coincida con el número de orden y la cédula suministrados. Por favor, verifica la ortografía e intenta nuevamente.');
-      }
-    }, 900);
+    if (error) {
+      setErrorMsg(`⚠️ ${error}`);
+    } else if (order) {
+      setFoundOrder(order);
+    } else {
+      setErrorMsg('⚠️ No se encontró ningún pedido que coincida con el número de orden y la cédula suministrados. Por favor, verifica la ortografía e intenta nuevamente.');
+    }
   };
 
   // Status mapping to stages

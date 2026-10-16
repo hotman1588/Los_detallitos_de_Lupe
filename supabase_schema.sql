@@ -1,8 +1,16 @@
 -- =======================================================
 -- SCRIPT DE CONFIGURACIÓN DE BASE DE DATOS PARA SUPABASE
+--
+-- Crea las tablas base. Las reglas de seguridad (RLS, funciones
+-- del portal, contraseñas cifradas, bloqueo de pedidos entregados)
+-- viven en supabase/migrations/ y se aplican DESPUÉS de este script:
+--   supabase db push --linked
+--
+-- No agregues aquí políticas que permitan escribir a anónimos.
 -- =======================================================
 
--- 1. Tabla de Productos/Catálogo
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
 CREATE TABLE IF NOT EXISTS catalogo_productos (
     id VARCHAR(50) PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
@@ -14,19 +22,6 @@ CREATE TABLE IF NOT EXISTS catalogo_productos (
     discount_percentage INTEGER DEFAULT 0
 );
 
--- Habilitar RLS (Row Level Security)
-ALTER TABLE catalogo_productos ENABLE ROW LEVEL SECURITY;
-
--- Crear políticas para permitir lectura anónima y gestión total
-DROP POLICY IF EXISTS "Permitir lectura publica de productos" ON catalogo_productos;
-CREATE POLICY "Permitir lectura publica de productos" ON catalogo_productos
-    FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Permitir gestion total anonima de productos" ON catalogo_productos;
-CREATE POLICY "Permitir gestion total anonima de productos" ON catalogo_productos
-    FOR ALL USING (true) WITH CHECK (true);
-
--- 2. Tabla de Pedidos/Ordenes
 CREATE TABLE IF NOT EXISTS pedidos (
     id VARCHAR(50) PRIMARY KEY,
     shipping JSONB NOT NULL,
@@ -43,79 +38,42 @@ CREATE TABLE IF NOT EXISTS pedidos (
     assigned_domi_username VARCHAR(120)
 );
 
-ALTER TABLE pedidos ENABLE ROW LEVEL SECURITY;
-
--- Crear políticas de pedidos
-DROP POLICY IF EXISTS "Permitir lectura de pedidos anonima" ON pedidos;
-CREATE POLICY "Permitir lectura de pedidos anonima" ON pedidos
-    FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Permitir creacion y modificacion anonima de pedidos" ON pedidos;
-CREATE POLICY "Permitir creacion y modificacion anonima de pedidos" ON pedidos
-    FOR ALL USING (true) WITH CHECK (true);
-
--- 3. Tabla de Usuarios del Sistema (Backoffice)
+-- La contraseña se guarda solo como hash bcrypt (columna password_hash).
 CREATE TABLE IF NOT EXISTS system_users (
     id VARCHAR(50) PRIMARY KEY,
     username VARCHAR(100) UNIQUE NOT NULL,
-    password TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
     name VARCHAR(150) NOT NULL,
     phone VARCHAR(50),
     email VARCHAR(150),
     role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'supervisor', 'domiciliario'))
 );
 
-ALTER TABLE system_users DROP CONSTRAINT IF EXISTS system_users_role_check;
-ALTER TABLE system_users
-    ADD CONSTRAINT system_users_role_check
-    CHECK (role IN ('admin', 'supervisor', 'domiciliario'));
-
-ALTER TABLE system_users ENABLE ROW LEVEL SECURITY;
-
--- Crear políticas de usuarios
-DROP POLICY IF EXISTS "Permitir lectura de usuarios para autenticacion" ON system_users;
-CREATE POLICY "Permitir lectura de usuarios para autenticacion" ON system_users
-    FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Permitir gestion de usuarios anonima" ON system_users;
-CREATE POLICY "Permitir gestion de usuarios anonima" ON system_users
-    FOR ALL USING (true) WITH CHECK (true);
-
--- 4. Tabla de Configuración de Negocio (Descuentos de categorías, prefijo, contador)
 CREATE TABLE IF NOT EXISTS configuracion (
     key VARCHAR(100) PRIMARY KEY,
     value JSONB NOT NULL
 );
 
+ALTER TABLE catalogo_productos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pedidos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE configuracion ENABLE ROW LEVEL SECURITY;
-
--- Crear políticas de configuración
-DROP POLICY IF EXISTS "Permitir lectura de configuraciones" ON configuracion;
-CREATE POLICY "Permitir lectura de configuraciones" ON configuracion
-    FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Permitir actualizacion de configuraciones" ON configuracion;
-CREATE POLICY "Permitir actualizacion de configuraciones" ON configuracion
-    FOR ALL USING (true) WITH CHECK (true);
 
 -- =======================================================
 -- SEMILLAS / DATOS INICIALES (SEED DATA)
 -- =======================================================
 
--- Configuración Inicial
 INSERT INTO configuracion (key, value) VALUES
 ('category_discounts', '{"desayunos": 0, "flores": 0, "detalles": 0}'::jsonb),
 ('id_prefix', '"LDL-"'::jsonb),
 ('id_counter', '1'::jsonb)
 ON CONFLICT (key) DO NOTHING;
 
--- Usuarios Iniciales (Credenciales de Administrador y Domiciliario)
-INSERT INTO system_users (id, username, password, name, phone, email, role) VALUES 
-('1016016370', 'admin', 'Allus2013.**', 'Administrador Principal', '3138005702', 'admin@detallitoslupe.com', 'admin'),
-('1016016375', 'domiciliario', '1016016375', 'Domiciliario 1', '3114445566', 'domi1@detallitoslupe.com', 'domiciliario')
-ON CONFLICT (id) DO NOTHING;
--- Nota: la contraseña de admin NO se sobrescribe en re-ejecuciones; se respeta
--- la que esté guardada para permitir cambiarla desde el backoffice.
+-- Primer administrador: reemplaza los valores y ejecuta UNA vez en el SQL Editor.
+-- La contraseña nunca debe quedar escrita en el repositorio.
+-- INSERT INTO system_users (id, username, password_hash, name, phone, email, role)
+-- VALUES ('<cedula>', 'admin', extensions.crypt('<contraseña-segura>', extensions.gen_salt('bf', 10)),
+--         'Administrador Principal', '<celular>', '<correo>', 'admin');
 
 -- Productos Iniciales
 INSERT INTO catalogo_productos (id, name, price, category, image, description, featured, discount_percentage) VALUES 
