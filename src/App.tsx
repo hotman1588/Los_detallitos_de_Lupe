@@ -309,7 +309,7 @@ ${error || 'Error desconocido.'}`);
       return;
     }
     await refreshStaffOrders();
-    showToast(`🗑️ Se eliminaron ${count} pedidos no entregados. Los entregados se conservan.`);
+    showToast(`🗑️ Se eliminaron ${count} pedidos del sistema.`);
   };
 
   // Filter Catalog Products

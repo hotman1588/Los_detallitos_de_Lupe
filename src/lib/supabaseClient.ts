@@ -231,7 +231,7 @@ export async function updateOrderCoords(id: string, lat: number, lng: number): P
   return { order: mapOrderFromDb(data) };
 }
 
-// Elimina los pedidos no entregados; los entregados se conservan siempre.
+// Elimina todos los pedidos, incluidos los entregados (solo administrador).
 export async function deleteOpenOrders(): Promise<{ count?: number; error?: string }> {
   const { data, error } = await rpc<number>('staff_delete_orders', { p_token: staffToken() });
   if (error) return { error };
