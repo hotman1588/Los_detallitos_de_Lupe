@@ -18,10 +18,14 @@ export default function PromoBanner() {
             Pedidos para Bogotá y Soacha con un mínimo de <strong>3 días de anticipación</strong>.
           </span>
         </div>
-        <div className="hidden md:flex items-center gap-4 text-xs">
-          <span>🌸 Detalles hechos con amor</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-white/60"></span>
-          <span>🚚 Envíos de Lunes a Domingo de 6:00 AM a 1:00 PM</span>
+        {/* El horario de envíos se muestra también en celular; solo el lema se reserva para pantallas grandes. */}
+        <div className="flex items-center justify-center gap-4 text-[11px] sm:text-xs">
+          <span className="hidden md:inline">🌸 Detalles hechos con amor</span>
+          <span className="hidden md:inline w-1.5 h-1.5 rounded-full bg-white/60"></span>
+          <span className="leading-snug">
+            🚚 Envíos de lunes a domingo de <strong>7:00 AM a 6:00 PM</strong>
+            <span className="block sm:inline text-white/85 sm:ml-1">· Horario extendido en eventos especiales acordados con nuestros clientes</span>
+          </span>
         </div>
       </div>
     </div>

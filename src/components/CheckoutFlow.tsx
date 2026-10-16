@@ -1004,6 +1004,7 @@ export default function CheckoutFlow({
                             <option value="11:00 AM - 01:00 PM">11:00 AM - 01:00 PM (Almuerzo)</option>
                             <option value="01:00 PM - 03:00 PM">01:00 PM - 03:00 PM (Tarde Temprana)</option>
                             <option value="03:00 PM - 05:00 PM">03:00 PM - 05:00 PM (Tarde)</option>
+                            <option value="05:00 PM - 06:00 PM">05:00 PM - 06:00 PM (Final de la Tarde)</option>
                           </select>
                         </div>
                       </div>
@@ -1072,6 +1073,7 @@ export default function CheckoutFlow({
                         <option value="11:00 AM - 01:00 PM">11:00 AM - 01:00 PM (Almuerzo)</option>
                         <option value="01:00 PM - 03:00 PM">01:00 PM - 03:00 PM (Tarde Temprana)</option>
                         <option value="03:00 PM - 05:00 PM">03:00 PM - 05:00 PM (Tarde)</option>
+                        <option value="05:00 PM - 06:00 PM">05:00 PM - 06:00 PM (Final de la Tarde)</option>
                       </select>
                     </div>
                   </div>
