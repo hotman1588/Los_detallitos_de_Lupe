@@ -664,7 +664,7 @@ export default function CheckoutFlow({
                     required
                     value={buyerCedula}
                     onChange={(e) => setBuyerCedula(e.target.value)}
-                    placeholder="Ej. 1016016370"
+                    placeholder="Ej. 79461253"
                     className={`w-full bg-white border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 transition ${
                       showErrors && !buyerCedula.trim()
                         ? 'border-red-500 ring-2 ring-red-100 bg-red-50/10'
@@ -681,7 +681,7 @@ export default function CheckoutFlow({
                     required
                     value={buyerPhone}
                     onChange={(e) => setBuyerPhone(e.target.value)}
-                    placeholder="Ej. 3123456789"
+                    placeholder="Ej. 3016284957"
                     className={`w-full bg-white border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 transition ${
                       showErrors && !buyerPhone.trim()
                         ? 'border-red-500 ring-2 ring-red-100 bg-red-50/10'
@@ -1044,7 +1044,7 @@ export default function CheckoutFlow({
                         required={!multiAddress}
                         value={recipientPhone}
                         onChange={(e) => setRecipientPhone(e.target.value)}
-                        placeholder="Ej. 3159876543 (Importante para coordinar entrega)"
+                        placeholder="Ej. 3187462093 (Importante para coordinar entrega)"
                         className={`w-full bg-white border rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 transition ${
                           showErrors && !recipientPhone.trim()
                             ? 'border-red-500 ring-2 ring-red-100 bg-red-50/10'
@@ -1432,7 +1432,7 @@ export default function CheckoutFlow({
                   <div className="border border-slate-100 bg-emerald-50/20 p-5 rounded-2xl flex flex-col justify-between">
                     <div>
                       <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">Nequi</span>
-                      <h4 className="font-bold text-xl text-slate-800 mt-2">315 778 9524</h4>
+                      <h4 className="font-bold text-xl text-slate-800 mt-2">313 800 5702</h4>
                       <p className="text-xs text-slate-500 mt-1">Celular de transferencia directa sin costo</p>
                     </div>
                     <p className="text-xs font-semibold text-slate-600 mt-4">Titular: Los Detallitos de Lupe S.A.S</p>
@@ -1441,7 +1441,7 @@ export default function CheckoutFlow({
                   <div className="border border-slate-100 bg-peach-light/25 p-5 rounded-2xl flex flex-col justify-between">
                     <div>
                       <span className="bg-peach-light text-earth-brown text-[10px] font-bold px-2 py-0.5 rounded-md uppercase border border-sage-light/10">DaviPlata</span>
-                      <h4 className="font-bold text-xl text-slate-800 mt-2">315 778 9524</h4>
+                      <h4 className="font-bold text-xl text-slate-800 mt-2">313 800 5702</h4>
                       <p className="text-xs text-slate-500 mt-1">Monedero digital Davivienda</p>
                     </div>
                     <p className="text-xs font-semibold text-slate-600 mt-4">Titular: Los Detallitos de Lupe S.A.S</p>
@@ -1449,14 +1449,11 @@ export default function CheckoutFlow({
 
                   <div className="border border-slate-100 bg-sky-50/20 p-5 rounded-2xl flex flex-col justify-between">
                     <div>
-                      <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">Bancolombia</span>
-                      <h4 className="font-bold text-base text-slate-800 mt-2">741-258-963-02</h4>
-                      <p className="text-xs text-slate-500">Cuenta de Ahorros Recaudos</p>
+                      <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">Bre-B</span>
+                      <h4 className="font-bold text-base text-slate-800 mt-2 break-all">@millave3138005702</h4>
+                      <p className="text-xs text-slate-500 mt-1">Llave Bre-B: transferencia inmediata desde cualquier banco o billetera</p>
                     </div>
-                    <div className="mt-4 text-[10px] text-slate-500">
-                      <p className="font-semibold text-slate-600">NIT: 901.345.678-9</p>
-                      <p>Los Detallitos de Lupe S.A.S.</p>
-                    </div>
+                    <p className="text-xs font-semibold text-slate-600 mt-4">Titular: Los Detallitos de Lupe S.A.S</p>
                   </div>
                 </div>
               </>

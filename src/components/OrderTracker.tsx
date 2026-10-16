@@ -180,7 +180,7 @@ export default function OrderTracker() {
                     }
                     setOrderId(val);
                   }}
-                  placeholder="Ej: LDL-38491"
+                  placeholder="Ej: LDL-62740"
                   className="w-full pl-10 pr-4 py-3 bg-slate-50 hover:bg-slate-50/50 focus:bg-white border border-slate-200 focus:border-sage-primary rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-sage-primary/10 transition-all font-mono font-black text-slate-800 uppercase tracking-widest placeholder:lowercase"
                 />
               </div>

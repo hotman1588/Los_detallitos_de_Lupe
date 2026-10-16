@@ -1799,7 +1799,7 @@ export default function AdminPanel({
                   shipping: {
                     buyerName: ["Sofia Gómez D.", "Mauricio Ospina", "Luisa Fernanda", "Camilo Torres"][Math.floor(Math.random() * 4)],
                     buyerPhone: "315" + Math.floor(1000000 + Math.random() * 9000000),
-                    buyerCedula: "1016016" + Math.floor(100 + Math.random() * 900),
+                    buyerCedula: String(Math.floor(10000000 + Math.random() * 90000000)),
                     recipientName: "Liliana Restrepo V.",
                     recipientPhone: "320" + Math.floor(1000000 + Math.random() * 9000000),
                     municipio: "Bogotá D.C.",
@@ -1928,7 +1928,7 @@ export default function AdminPanel({
                   min="1"
                   value={adminIdCounter}
                   onChange={(e) => setAdminIdCounter(e.target.value)}
-                  placeholder="70411"
+                  placeholder="52817"
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-sage-primary text-slate-800 font-bold font-mono"
                 />
               </div>
@@ -3082,7 +3082,7 @@ export default function AdminPanel({
                     min={100}
                     value={prodPrice}
                     onChange={(e) => setProdPrice(Number(e.target.value))}
-                    placeholder="Ej. 120000"
+                    placeholder="Ej. 87500"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-primary transition"
                   />
                 </div>
@@ -3716,7 +3716,7 @@ export default function AdminPanel({
                     onChange={(e) => {
                       setNewUserCedula(e.target.value);
                     }}
-                    placeholder="Ej. 1016016370"
+                    placeholder="Ej. 52384917"
                     className="w-full bg-slate-55/40 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-sage-primary text-slate-800"
                   />
                 </div>
@@ -3765,7 +3765,7 @@ export default function AdminPanel({
                       required
                       value={newUserPhone}
                       onChange={(e) => setNewUserPhone(e.target.value)}
-                      placeholder="Ej. 3138005702"
+                      placeholder="Ej. 3204718265"
                       className="w-full bg-slate-55/40 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-sage-primary text-slate-800"
                     />
                   </div>
