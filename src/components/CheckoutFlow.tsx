@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { CartItem, ShippingDetails, Order } from '../types';
-import { DIVIPOLA_DATA } from '../divipola';
+import { DIVIPOLA_DATA, ZONA_COBERTURA } from '../divipola';
 import { Calendar, MapPin, Gift, CreditCard, ChevronRight, CheckCircle, ArrowLeft, Upload, Trash2 } from 'lucide-react';
 import MapPicker from './MapPicker';
 import { getProductDiscount, getProductEffectivePrice, compressImageBase64 } from '../lib/promoUtils';
@@ -573,7 +573,7 @@ export default function CheckoutFlow({
                     <span className="font-semibold text-slate-800">${subtotal.toLocaleString('es-CO')} COP</span>
                   </div>
                   <div className="flex flex-col sm:flex-row sm:justify-between text-sm text-slate-600 border-t border-sage-light/10 pt-2 mt-1">
-                    <span>Costo del envío (Bogotá/Soacha):</span>
+                    <span>Costo del envío ({ZONA_COBERTURA}):</span>
                     <span className="font-semibold text-slate-800 text-right">Entre $10.000 y $15.000 COP *</span>
                   </div>
                   <p className="text-[11px] text-slate-500 italic mt-1 leading-relaxed">
@@ -1094,7 +1094,7 @@ export default function CheckoutFlow({
                         ¡Sí! Incluir servicio de domicilio por un valor fijo de $12.000 COP
                       </span>
                       <span className="text-[11px] text-slate-500 block mt-0.5">
-                        Se añade al total del pedido. Ofrecemos cobertura e ingeniosa entrega puerta a puerta en Bogotá y Soacha.
+                        Se añade al total del pedido. Ofrecemos cobertura e ingeniosa entrega puerta a puerta en {ZONA_COBERTURA}.
                       </span>
                     </div>
                   </label>
@@ -1103,7 +1103,7 @@ export default function CheckoutFlow({
                 {/* DIVIPOLA INTER-DEPENDENT DROPDOWNS */}
                 <div className="bg-slate-50/40 p-5 rounded-2xl border border-slate-100 space-y-4">
                   <h4 className="font-bold text-slate-700 text-sm uppercase tracking-wider flex items-center gap-2">
-                    <span>📍</span> Dirección Obligatoria de Despacho (Bogotá y Soacha)
+                    <span>📍</span> Dirección Obligatoria de Despacho ({ZONA_COBERTURA})
                   </h4>
                   <p className="text-xs text-slate-500 leading-relaxed">
                     Por favor, selecciona tu ubicación exacta. El diligenciamiento de Municipio, Localidad o Zona, Barrio y Dirección Detallada es **completamente obligatorio** para todos los pedidos para evitar errores de programación.

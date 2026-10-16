@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { ZONA_COBERTURA } from '../divipola';
 
 export default function PromoBanner() {
   return (
@@ -15,7 +16,7 @@ export default function PromoBanner() {
             Aviso Importante
           </span>
           <span className="font-medium">
-            Pedidos para Bogotá y Soacha con un mínimo de <strong>3 días de anticipación</strong>.
+            Pedidos para {ZONA_COBERTURA} con un mínimo de <strong>3 días de anticipación</strong>.
           </span>
         </div>
         {/* El horario de envíos se muestra también en celular; solo el lema se reserva para pantallas grandes. */}

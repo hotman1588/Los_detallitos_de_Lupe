@@ -12,6 +12,7 @@ import CheckoutFlow from './components/CheckoutFlow';
 import AdminPanel from './components/AdminPanel';
 import OrderTracker from './components/OrderTracker';
 import CartSideTab from './components/CartSideTab';
+import { ZONA_COBERTURA, SOACHA_HABILITADA } from './divipola';
 import { getProductDiscount, getProductEffectivePrice } from './lib/promoUtils';
 import { ShoppingCart, Search, Eye, ShoppingBag, ListFilter, CheckCircle, Heart, Truck, Gift, MessageCircle, Flower2, Crown } from 'lucide-react';
 import {
@@ -448,7 +449,7 @@ ${error || 'Error desconocido.'}`);
                   <Truck className="text-sage-primary shrink-0" size={20} />
                   <div>
                     <h4 className="text-xs font-bold text-slate-800">Despachos Especiales</h4>
-                    <p className="text-[10px] text-slate-500">Bogotá & Soacha (7 am a 5 pm)</p>
+                    <p className="text-[10px] text-slate-500">{ZONA_COBERTURA} (7 am a 6 pm)</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 bg-peach-light/30 rounded-2xl border border-sage-light/10">
@@ -841,7 +842,7 @@ ${error || 'Error desconocido.'}`);
                 ¿Te vas sin asegurar tu sorpresa?
               </h3>
               <p className="text-xs text-slate-505 max-w-md mx-auto leading-relaxed">
-                Tienes productos espectaculares listos en tu bandeja de pedido. Al terminar tu compra ahora, podemos agendar tu fecha y hora exacta de reparto en Bogotá o Soacha.
+                Tienes productos espectaculares listos en tu bandeja de pedido. Al terminar tu compra ahora, podemos agendar tu fecha y hora exacta de reparto en {SOACHA_HABILITADA ? 'Bogotá o Soacha' : 'Bogotá'}.
               </p>
             </div>
 
@@ -964,7 +965,7 @@ ${error || 'Error desconocido.'}`);
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-4">
           <p className="font-bold text-slate-300">🌸 Los Detallitos de Lupe • Desayunos, Detalles y Floristería S.A.S</p>
           <p className="max-w-lg mx-auto leading-relaxed text-slate-500 text-[11px]">
-            Pedidos con 3 días de anticipación para entregas sin contratiempos en las comunas de Soacha y localidades de Bogotá D.C., Colombia.
+            Pedidos con 3 días de anticipación para entregas sin contratiempos en {SOACHA_HABILITADA ? 'las comunas de Soacha y ' : ''}las localidades de Bogotá D.C., Colombia.
           </p>
           <p className="text-[10px] text-slate-600">&copy; {new Date().getFullYear()} Los Detallitos de Lupe. Todos los derechos reservados.</p>
         </div>

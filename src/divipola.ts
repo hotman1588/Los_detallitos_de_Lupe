@@ -9,7 +9,7 @@ export interface DivipolaStructure {
   };
 }
 
-export const DIVIPOLA_DATA: DivipolaStructure = {
+const DIVIPOLA_COMPLETO: DivipolaStructure = {
   "Bogotá D.C.": {
     "Usaquén (Localidad 1)": [
       "Cedritos",
@@ -299,3 +299,14 @@ export const DIVIPOLA_DATA: DivipolaStructure = {
     ]
   }
 };
+
+// Soacha está oculta temporalmente en los pedidos. Cambiar a true para volver a ofrecerla.
+export const SOACHA_HABILITADA = false;
+
+// Municipios que el cliente puede elegir al hacer un pedido.
+export const DIVIPOLA_DATA: DivipolaStructure = Object.fromEntries(
+  Object.entries(DIVIPOLA_COMPLETO).filter(([municipio]) => SOACHA_HABILITADA || municipio !== 'Soacha')
+);
+
+// Texto de cobertura para los mensajes de la tienda.
+export const ZONA_COBERTURA = SOACHA_HABILITADA ? 'Bogotá y Soacha' : 'Bogotá';
