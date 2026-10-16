@@ -12,7 +12,7 @@ import CheckoutFlow from './components/CheckoutFlow';
 import AdminPanel from './components/AdminPanel';
 import OrderTracker from './components/OrderTracker';
 import { getProductDiscount, getProductEffectivePrice, safeSaveOrders } from './lib/promoUtils';
-import { ShoppingCart, Search, Eye, ShoppingBag, ListFilter, CheckCircle, Shield, Heart, Truck, Gift, MessageCircle, Flower2 } from 'lucide-react';
+import { ShoppingCart, Search, Eye, ShoppingBag, ListFilter, CheckCircle, Heart, Truck, Gift, MessageCircle, Flower2, Crown } from 'lucide-react';
 import {
   isSupabaseConfigured,
   getProducts,
@@ -28,6 +28,10 @@ import {
 export default function App() {
   // Navigation State: 'catalog' | 'tracker' | 'checkout' | 'admin'
   const [view, setView] = useState<'catalog' | 'tracker' | 'checkout' | 'admin'>('catalog');
+
+  // Estilos de las pestañas del header: la activa resalta con el degradado de marca
+  const navActiveClass = 'bg-gradient-to-r from-sage-primary to-sage-light text-white shadow-md shadow-sage-primary/30 ring-2 ring-sage-light/30';
+  const navIdleClass = 'text-slate-600 hover:bg-rose-50 hover:text-sage-primary';
 
   // Products and Orders persistence
   const [products, setProducts] = useState<Product[]>([]);
@@ -400,14 +404,13 @@ export default function App() {
           </div>
 
           {/* Navigation Action tabs */}
-          <nav className="flex items-center gap-2">
+          <nav className="flex flex-wrap items-center justify-center gap-2">
             <button
               onClick={() => setView('catalog')}
               id="nav-catalogo"
-              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 ${
-                view === 'catalog'
-                  ? 'bg-peach-light text-earth-brown border border-sage-light/20'
-                  : 'text-slate-600 hover:bg-slate-100'
+              aria-current={view === 'catalog' ? 'page' : undefined}
+              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 cursor-pointer ${
+                view === 'catalog' ? navActiveClass : navIdleClass
               }`}
             >
               🛍️ Catálogo Virtual
@@ -415,10 +418,9 @@ export default function App() {
             <button
               onClick={() => setView('tracker')}
               id="nav-tracker"
-              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 ${
-                view === 'tracker'
-                  ? 'bg-peach-light text-earth-brown border border-sage-light/20'
-                  : 'text-slate-600 hover:bg-slate-100'
+              aria-current={view === 'tracker' ? 'page' : undefined}
+              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-300 cursor-pointer ${
+                view === 'tracker' ? navActiveClass : navIdleClass
               }`}
             >
               📋 Consultar Pedido
@@ -426,15 +428,16 @@ export default function App() {
             <button
               onClick={() => setView('checkout')}
               id="nav-checkout"
-              className={`px-4.5 py-2.5 rounded-full text-xs sm:text-sm font-extrabold transition-all duration-300 flex items-center gap-2 shadow-xs cursor-pointer ${
+              aria-current={view === 'checkout' ? 'page' : undefined}
+              className={`px-4.5 py-2 rounded-full text-xs sm:text-sm font-extrabold transition-all duration-300 flex items-center gap-2 cursor-pointer ${
                 view === 'checkout'
-                  ? 'bg-rose-100 text-rose-800 border border-rose-200/50 shadow-md scale-102'
+                  ? navActiveClass
                   : cartCount > 0
                   ? 'bg-[#E07A5F] text-white hover:bg-[#D66B4E] ring-4 ring-[#E07A5F]/20 animate-pulse font-extrabold shadow-sm'
-                  : 'text-slate-700 bg-white hover:bg-slate-50 border border-slate-205/80'
+                  : 'text-slate-700 bg-white hover:bg-slate-50 border border-slate-300'
               }`}
             >
-              <ShoppingCart size={16} className={cartCount > 0 ? "animate-bounce" : ""} />
+              <ShoppingCart size={16} className={cartCount > 0 && view !== 'checkout' ? "animate-bounce" : ""} />
               <span>Mi Pedido ({cartCount})</span>
               {cartCount > 0 && (
                 <span className="bg-white text-[#E07A5F] text-[9px] font-black px-2 py-0.5 rounded-full border border-rose-100 leading-none">
@@ -445,14 +448,15 @@ export default function App() {
             <button
               onClick={() => setView('admin')}
               id="nav-admin"
-              className={`px-4 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center gap-1 ${
+              aria-current={view === 'admin' ? 'page' : undefined}
+              className={`group relative px-4.5 py-2 rounded-full text-xs sm:text-sm font-bold tracking-wide transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
                 view === 'admin'
-                  ? 'bg-slate-800 text-white'
-                  : 'text-slate-600 hover:bg-slate-100'
+                  ? 'bg-gradient-to-r from-earth-brown via-sage-primary to-earth-brown text-terracotta shadow-lg shadow-earth-brown/30 ring-2 ring-terracotta/70'
+                  : 'bg-gradient-to-r from-earth-brown to-sage-primary text-white shadow-md shadow-earth-brown/20 ring-1 ring-terracotta/40 hover:ring-2 hover:ring-terracotta/80 hover:shadow-lg hover:-translate-y-0.5'
               }`}
             >
-              <Shield size={14} />
-              Backoffice
+              <Crown size={15} className="text-terracotta transition-transform duration-300 group-hover:-rotate-12" />
+              Ingresar a Portal
             </button>
           </nav>
         </div>
