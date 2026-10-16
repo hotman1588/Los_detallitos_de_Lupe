@@ -36,12 +36,6 @@ export default function CheckoutFlow({
 
   // Delivery & Payment selection option states
   const [includeShipping, setIncludeShipping] = useState(true);
-  const [paymentMethod, setPaymentMethod] = useState<'transfer' | 'pse'>('transfer');
-  const [pseBank, setPseBank] = useState('');
-  const [pseUserType, setPseUserType] = useState('natural');
-  const [pseEmail, setPseEmail] = useState('');
-  const [pseCompleted, setPseCompleted] = useState(false);
-  const [pseTransReference, setPseTransReference] = useState('');
 
   // Form Fields
   const [buyerName, setBuyerName] = useState('');
@@ -461,7 +455,7 @@ export default function CheckoutFlow({
       `\n💰 *VALOR TOTAL Y DETALLES:*\n` +
       `• *Total Orden:* $${total.toLocaleString('es-CO')} COP\n` +
       `• *Servicio de Envío:* ${includeShipping ? '✓ Reparto Estándar ($12.000 COP fijos)' : '⏰ Pendiente coordinar cobertura y tarifa'}\n` +
-      `• *Medio de Pago:* ${paymentMethod === 'pse' ? `PSE / Nequi / Daviplata (${pseBank})` : 'Transferencia Bancaria Directa'}\n` +
+      `• *Medio de Pago:* Transferencia (Nequi / DaviPlata / Bre-B)\n` +
       (cardPhotos.length > 0 ? `• *Fotos Tarjeta:* ¹ ${cardPhotos.length} imagen(es) adjuntada(s)\n` : '') +
       `• *Dedicatoria:* _"${mensajeTarjeta}"_\n\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -1393,219 +1387,40 @@ export default function CheckoutFlow({
               <span>Instrucciones de Pago y Confirmación</span>
             </h3>
 
-            {/* MÉTODOS DE PAGO: SELECTOR */}
-            <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-100 rounded-2xl border border-slate-200/50">
-              <button
-                type="button"
-                id="btn-pay-method-transfer"
-                onClick={() => setPaymentMethod('transfer')}
-                className={`py-3 px-4 text-center text-xs sm:text-sm font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-2 ${
-                  paymentMethod === 'transfer'
-                    ? 'bg-white text-slate-800 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-                }`}
-              >
-                🏦 Transferencia Directa
-              </button>
-              <button
-                type="button"
-                id="btn-pay-method-pse"
-                onClick={() => setPaymentMethod('pse')}
-                className={`py-3 px-4 text-center text-xs sm:text-sm font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-2 ${
-                  paymentMethod === 'pse'
-                    ? 'bg-white text-slate-800 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-                }`}
-              >
-                <span className="bg-[#FF9900] text-slate-950 px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter">pse</span>
-                Pago Seguro Electrónico
-              </button>
-            </div>
+            <>
+              <p className="text-sm text-slate-600 leading-relaxed font-sans">
+                Para garantizar el despacho de tu pedido, realiza la transferencia del total exacto (<strong>${total.toLocaleString('es-CO')} COP</strong>) a cualquiera de nuestras cuentas autorizadas, y <strong>sube el soporte de pago de forma obligatoria</strong> mediante el formulario inferior.
+              </p>
 
-            {paymentMethod === 'transfer' ? (
-              <>
-                <p className="text-sm text-slate-600 leading-relaxed font-sans">
-                  Para garantizar el despacho de tu pedido, realiza la transferencia del total exacto (<strong>${total.toLocaleString('es-CO')} COP</strong>) a cualquiera de nuestras cuentas autorizadas, y <strong>sube el soporte de pago de forma obligatoria</strong> mediante el formulario inferior.
-                </p>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="border border-slate-100 bg-emerald-50/20 p-5 rounded-2xl flex flex-col justify-between">
-                    <div>
-                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">Nequi</span>
-                      <h4 className="font-bold text-xl text-slate-800 mt-2">313 800 5702</h4>
-                      <p className="text-xs text-slate-500 mt-1">Celular de transferencia directa sin costo</p>
-                    </div>
-                    <p className="text-xs font-semibold text-slate-600 mt-4">Titular: Los Detallitos de Lupe S.A.S</p>
-                  </div>
-
-                  <div className="border border-slate-100 bg-peach-light/25 p-5 rounded-2xl flex flex-col justify-between">
-                    <div>
-                      <span className="bg-peach-light text-earth-brown text-[10px] font-bold px-2 py-0.5 rounded-md uppercase border border-sage-light/10">DaviPlata</span>
-                      <h4 className="font-bold text-xl text-slate-800 mt-2">313 800 5702</h4>
-                      <p className="text-xs text-slate-500 mt-1">Monedero digital Davivienda</p>
-                    </div>
-                    <p className="text-xs font-semibold text-slate-600 mt-4">Titular: Los Detallitos de Lupe S.A.S</p>
-                  </div>
-
-                  <div className="border border-slate-100 bg-sky-50/20 p-5 rounded-2xl flex flex-col justify-between">
-                    <div>
-                      <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">Bre-B</span>
-                      <h4 className="font-bold text-base text-slate-800 mt-2 break-all">@millave3138005702</h4>
-                      <p className="text-xs text-slate-500 mt-1">Llave Bre-B: transferencia inmediata desde cualquier banco o billetera</p>
-                    </div>
-                    <p className="text-xs font-semibold text-slate-600 mt-4">Titular: Los Detallitos de Lupe S.A.S</p>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="space-y-4 bg-[#F2F8FF]/80 p-5 rounded-2xl border border-blue-200/50">
-                <div className="flex items-center gap-3">
-                  <span className="bg-[#002F6C] text-white font-black px-2.5 py-1 rounded-lg text-xs uppercase tracking-wider select-none">
-                    ach pse
-                  </span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="border border-slate-100 bg-emerald-50/20 p-5 rounded-2xl flex flex-col justify-between">
                   <div>
-                    <h4 className="font-bold text-slate-850 text-sm">Pasarela de Pago Seguro PSE</h4>
-                    <p className="text-xs text-slate-500">Autoriza transacciones inmediatas desde tu cuenta de ahorros, corriente o billetera.</p>
+                    <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">Nequi</span>
+                    <h4 className="font-bold text-xl text-slate-800 mt-2">313 800 5702</h4>
+                    <p className="text-xs text-slate-500 mt-1">Celular de transferencia directa sin costo</p>
                   </div>
+                  <p className="text-xs font-semibold text-slate-600 mt-4">Titular: Los Detallitos de Lupe S.A.S</p>
                 </div>
 
-                {!pseCompleted ? (
-                  <div className="space-y-4 pt-4 border-t border-blue-205/30">
-                    <p className="text-xs text-slate-600 leading-relaxed font-sans">
-                      Ingresa tus datos registrados para simular la conexión oficial de la pasarela de pagos ACH PSE con el comercio <strong>Los Detallitos de Lupe</strong>. El total a debitar es de <strong>${total.toLocaleString('es-CO')} COP</strong> {includeShipping && <span className="font-bold text-sage-primary">(Incluye domicilio fijos de $12.000 COP)</span>}.
-                    </p>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Entidad Financiera (Banco) *</label>
-                        <select
-                          required={paymentMethod === 'pse'}
-                          value={pseBank}
-                          onChange={(e) => setPseBank(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-                        >
-                          <option value="">-- Elige tu Banco --</option>
-                          <option value="Nequi">Nequi</option>
-                          <option value="DaviPlata">DaviPlata</option>
-                          <option value="Bancolombia">Bancolombia (Ahorros o Corriente)</option>
-                          <option value="Davivienda">Banco Davivienda</option>
-                          <option value="Banco de Bogota">Banco de Bogotá</option>
-                          <option value="BBVA Colombia">BBVA Colombia</option>
-                          <option value="Lulo Bank">Lulo Bank</option>
-                          <option value="RappiPay">RappiPay Davivienda</option>
-                          <option value="Banco de Occidente">Banco de Occidente</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">Tipo de Persona *</label>
-                        <select
-                          value={pseUserType}
-                          onChange={(e) => setPseUserType(e.target.value)}
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-                        >
-                          <option value="natural">Persona Natural</option>
-                          <option value="juridica">Persona Jurídica</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">Correo Electrónico Registrado en PSE *</label>
-                      <input
-                        type="email"
-                        required={paymentMethod === 'pse'}
-                        placeholder="ejemplo@correo.com"
-                        value={pseEmail}
-                        onChange={(e) => setPseEmail(e.target.value)}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      id="btn-simulate-pse"
-                      onClick={() => {
-                        if (!pseBank) {
-                          alert("⚠️ Por favor selecciona una Entidad Financiera (Banco).");
-                          return;
-                        }
-                        if (!pseEmail.trim() || !pseEmail.includes('@')) {
-                          alert("⚠️ Por favor ingresa un dirección de correo registrada en el registro de PSE.");
-                          return;
-                        }
-                        const reference = "PSE-" + Math.floor(100000 + Math.random() * 900000);
-                        setPseTransReference(reference);
-                        
-                        // Let's formulate a nice simulated success receipt image over a hidden Canvas element
-                        const canvas = document.createElement('canvas');
-                        canvas.width = 400;
-                        canvas.height = 300;
-                        const ctx = canvas.getContext('2d');
-                        if (ctx) {
-                          ctx.fillStyle = '#0F172A'; 
-                          ctx.fillRect(0, 0, 400, 300);
-                          
-                          ctx.fillStyle = '#059669'; 
-                          ctx.fillRect(0, 0, 400, 60);
-                          
-                          ctx.fillStyle = '#FFFFFF';
-                          ctx.font = 'bold 16px sans-serif';
-                          ctx.fillText('PAGO SEGURO PSE - APROBADO', 20, 36);
-                          
-                          ctx.fillStyle = '#94A3B8';
-                          ctx.font = '12px sans-serif';
-                          ctx.fillText('Transacción exitosa para: Los Detallitos de Lupe', 20, 90);
-                          
-                          ctx.fillStyle = '#FFFFFF';
-                          ctx.font = '13px sans-serif';
-                          ctx.fillText('Referencia: ' + reference, 20, 120);
-                          ctx.fillText('Banco: ' + pseBank, 20, 150);
-                          ctx.fillText('E-mail: ' + pseEmail, 20, 180);
-                          ctx.fillText('Total Pago: $' + total.toLocaleString('es-CO') + ' COP', 20, 210);
-                          
-                          ctx.fillStyle = '#34D399';
-                          ctx.font = 'bold 15px sans-serif';
-                          ctx.fillText('✓ Transacción Autorizada por Red ACH', 20, 250);
-                        }
-                        const simulatedDataUrl = canvas.toDataURL('image/png');
-                        setReceiptBase64(simulatedDataUrl);
-                        setReceiptFileName(`COMPROBANTE_${reference}.png`);
-                        setPseCompleted(true);
-                      }}
-                      className="w-full bg-[#002F6C] hover:bg-[#001D45] text-white font-bold text-xs py-3 px-4 rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      💳 Ir a mi Banco & Confirmar Transacción
-                    </button>
+                <div className="border border-slate-100 bg-peach-light/25 p-5 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="bg-peach-light text-earth-brown text-[10px] font-bold px-2 py-0.5 rounded-md uppercase border border-sage-light/10">DaviPlata</span>
+                    <h4 className="font-bold text-xl text-slate-800 mt-2">313 800 5702</h4>
+                    <p className="text-xs text-slate-500 mt-1">Monedero digital Davivienda</p>
                   </div>
-                ) : (
-                  <div className="bg-emerald-50/20 border border-emerald-200 p-5 rounded-2xl text-center space-y-3">
-                    <span className="text-3xl select-none">🎉</span>
-                    <h4 className="font-bold text-green-800 text-sm">¡Transacción por PSE Aprobada con Éxito!</h4>
-                    <p className="text-xs text-slate-600">
-                      Conexión culminada con la red ACH mediante <strong>{pseBank}</strong>. Tu pago del total exacto de <strong>${total.toLocaleString('es-CO')} COP</strong> se ha efectuado.
-                    </p>
-                    <div className="bg-white p-4 rounded-xl border border-dashed border-emerald-200 text-left text-xs max-w-sm mx-auto space-y-1 text-slate-700 font-mono">
-                      <p>🏦 Banco Originador: {pseBank}</p>
-                      <p>📧 Email PSE: {pseEmail}</p>
-                      <p>🔢 Ref. Transacción: {pseTransReference}</p>
-                      <p className="font-sans font-bold text-green-700 mt-2">✓ Soporte digital generado y anexado al pedido de forma automática.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPseCompleted(false);
-                        setReceiptBase64('');
-                        setReceiptFileName('');
-                      }}
-                      className="text-xs text-blue-600 hover:text-blue-800 font-semibold underline cursor-pointer"
-                    >
-                      Volver a iniciar transacción o cambiar banco
-                    </button>
+                  <p className="text-xs font-semibold text-slate-600 mt-4">Titular: Los Detallitos de Lupe S.A.S</p>
+                </div>
+
+                <div className="border border-slate-100 bg-sky-50/20 p-5 rounded-2xl flex flex-col justify-between">
+                  <div>
+                    <span className="bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">Bre-B</span>
+                    <h4 className="font-bold text-base text-slate-800 mt-2 break-all">@millave3138005702</h4>
+                    <p className="text-xs text-slate-500 mt-1">Llave Bre-B: transferencia inmediata desde cualquier banco o billetera</p>
                   </div>
-                )}
+                  <p className="text-xs font-semibold text-slate-600 mt-4">Titular: Los Detallitos de Lupe S.A.S</p>
+                </div>
               </div>
-            )}
+            </>
 
             {/* MANDATORY RECEIPT UPLOADER */}
             <div className="bg-peach-light/10 border-2 border-dashed border-sage-light/30 p-6 rounded-2xl text-center space-y-3 relative">

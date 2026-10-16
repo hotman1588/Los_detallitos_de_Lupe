@@ -29,6 +29,48 @@ export default function MapPicker({
   const [loadingGeocoding, setLoadingGeocoding] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
 
+  // Mapa ampliado a pantalla completa; se minimiza solo al fijar el pin.
+  const [isExpanded, setIsExpanded] = useState(false);
+  const isExpandedRef = useRef(false);
+  const collapseTimerRef = useRef<number | undefined>(undefined);
+
+  const setExpanded = (expanded: boolean) => {
+    isExpandedRef.current = expanded;
+    setIsExpanded(expanded);
+  };
+
+  // Tras fijar el pin con el mapa ampliado, se minimiza dejando ver un instante el punto.
+  const collapseAfterPin = () => {
+    if (!isExpandedRef.current) return;
+    window.clearTimeout(collapseTimerRef.current);
+    collapseTimerRef.current = window.setTimeout(() => setExpanded(false), 700);
+  };
+
+  // Leaflet necesita recalcular su tamaño al cambiar el contenedor; además se
+  // bloquea el scroll de la página y se permite cerrar con Escape.
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const timer = window.setTimeout(() => {
+      if (map) {
+        map.invalidateSize();
+        if (markerRef.current) map.panTo(markerRef.current.getLatLng());
+      }
+    }, 80);
+    if (!isExpanded) return () => window.clearTimeout(timer);
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpanded(false); };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.clearTimeout(timer);
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [isExpanded]);
+
+  useEffect(() => () => window.clearTimeout(collapseTimerRef.current), []);
+
   // 1. Dynamic CDN Loader for Leaflet
   useEffect(() => {
     let active = true;
@@ -123,6 +165,7 @@ export default function MapPicker({
           const { lat, lng } = e.latlng;
           marker.setLatLng([lat, lng]);
           onChange({ lat, lng }, `Ubicación manual: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+          collapseAfterPin();
         });
 
         // Pin dragged event
@@ -131,6 +174,7 @@ export default function MapPicker({
           const lat = position.lat;
           const lng = position.lng;
           onChange({ lat, lng }, `Coordenadas ajustadas: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+          collapseAfterPin();
         });
       }
 
@@ -223,7 +267,41 @@ export default function MapPicker({
         </p>
       </div>
 
-      <div className="relative w-full h-[240px] rounded-2xl overflow-hidden border border-slate-250 shadow-xs bg-slate-100 flex flex-col justify-center items-center">
+      <div
+        className={
+          isExpanded
+            ? 'fixed inset-0 z-[70] bg-slate-100 flex flex-col'
+            : 'relative w-full h-[240px] rounded-2xl overflow-hidden border border-slate-250 shadow-xs bg-slate-100 flex flex-col justify-center items-center'
+        }
+      >
+        {/* Barra superior del mapa ampliado */}
+        {isExpanded && (
+          <div className="shrink-0 bg-gradient-to-r from-earth-brown to-sage-primary text-white px-4 py-3 flex items-center justify-between gap-3 shadow-md">
+            <p className="text-xs font-semibold leading-snug">
+              📍 Toca el lugar exacto de entrega o arrastra el pin. El mapa se cerrará al fijarlo.
+            </p>
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              className="shrink-0 bg-white/15 hover:bg-white/25 text-white text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer"
+            >
+              ✕ Cerrar
+            </button>
+          </div>
+        )}
+
+        {/* Botón para ampliar el mapa a pantalla completa */}
+        {!isExpanded && !readOnly && leafletLoaded && (
+          <button
+            type="button"
+            onClick={() => setExpanded(true)}
+            className="absolute top-2 left-12 z-[1000] bg-white/95 hover:bg-white text-sage-primary text-[11px] font-bold px-3 py-1.5 rounded-full shadow-md border border-slate-200 flex items-center gap-1.5 cursor-pointer"
+            aria-label="Ampliar mapa a pantalla completa"
+          >
+            ⛶ Ampliar mapa
+          </button>
+        )}
+
         {!leafletLoaded && (
           <div className="text-center p-4 space-y-2">
             <div className="w-8 h-8 rounded-full border-4 border-sage-primary/20 border-t-sage-primary animate-spin mx-auto" />
@@ -234,7 +312,7 @@ export default function MapPicker({
         {/* Actual Map Container */}
         <div 
           ref={mapContainerRef} 
-          className="w-full h-full" 
+          className={isExpanded ? 'w-full flex-1 min-h-0' : 'w-full h-full'}
           style={{ visibility: leafletLoaded ? 'visible' : 'hidden', position: leafletLoaded ? 'relative' : 'absolute' }}
         />
 
