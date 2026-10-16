@@ -9,7 +9,8 @@ export interface DivipolaStructure {
   };
 }
 
-const DIVIPOLA_COMPLETO: DivipolaStructure = {
+// Listado completo (incluye municipios ocultos); los pedidos usan DIVIPOLA_DATA.
+export const DIVIPOLA_COMPLETO: DivipolaStructure = {
   "Bogotá D.C.": {
     "Usaquén (Localidad 1)": [
       "Cedritos",

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ubicarBarrio } from '../geoBarrios';
 
 interface MapPickerProps {
   municipio: string;
@@ -26,8 +27,8 @@ export default function MapPicker({
   const mapInstanceRef = useRef<any>(null); // Leaflet map instance
   const markerRef = useRef<any>(null); // Leaflet marker instance
   const [leafletLoaded, setLeafletLoaded] = useState(false);
-  const [loadingGeocoding, setLoadingGeocoding] = useState(false);
-  const [geoError, setGeoError] = useState<string | null>(null);
+  // Aviso cuando el barrio no tiene punto exacto y el mapa se centra en la localidad.
+  const [geoNotice, setGeoNotice] = useState<string | null>(null);
 
   // Mapa ampliado a pantalla completa; se minimiza solo al fijar el pin.
   const [isExpanded, setIsExpanded] = useState(false);
@@ -203,58 +204,33 @@ export default function MapPicker({
     }
   }, [leafletLoaded, value]);
 
-  // 4. Geocode when physical input fields change "aproximándose a la dirección"
+  // 4. Al elegir municipio, localidad o barrio el mapa se centra con la tabla de
+  //    coordenadas de la app (sin depender de un buscador externo).
+  const skipInitialCenterRef = useRef(Boolean(value));
   useEffect(() => {
     if (!leafletLoaded || readOnly) return;
-    if (!municipio && !localidad && !barrio) return;
-
-    // Build Nominatim Search Query
-    const searchParts: string[] = [];
-    if (barrio) searchParts.push(`Barrio ${barrio}`);
-    if (localidad) searchParts.push(`Localidad ${localidad}`);
-    if (municipio) {
-      searchParts.push(municipio);
-    } else {
-      searchParts.push('Bogotá');
+    if (!municipio) return;
+    // Si el cliente ya había fijado el pin (p. ej. al volver a este paso), no se mueve al cargar.
+    if (skipInitialCenterRef.current) {
+      skipInitialCenterRef.current = false;
+      return;
     }
-    searchParts.push('Colombia');
 
-    const queryStr = searchParts.join(', ');
+    const ubicacion = ubicarBarrio(municipio, localidad, barrio);
+    if (!ubicacion) return;
 
-    const triggerGeocoding = async () => {
-      setLoadingGeocoding(true);
-      setGeoError(null);
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(queryStr)}`
-        );
-        if (!response.ok) throw new Error('Error al conectar con servidor de coordenadas');
-        const data = await response.json();
-        if (data && data.length > 0) {
-          const first = data[0];
-          const lat = parseFloat(first.lat);
-          const lng = parseFloat(first.lon);
-          
-          if (mapInstanceRef.current && markerRef.current) {
-            markerRef.current.setLatLng([lat, lng]);
-            mapInstanceRef.current.setView([lat, lng], 16);
-            onChange({ lat, lng }, first.display_name || queryStr);
-          }
-        }
-      } catch (err: any) {
-        console.warn('Geocoding search failed, staying at current point', err);
-        setGeoError('No se pudo encontrar las coordenadas de este barrio de inmediato. Por favor arrastra el pin manualmente.');
-      } finally {
-        setLoadingGeocoding(false);
-      }
-    };
+    if (mapInstanceRef.current && markerRef.current) {
+      const [lat, lng] = ubicacion.punto;
+      markerRef.current.setLatLng([lat, lng]);
+      mapInstanceRef.current.setView([lat, lng], ubicacion.precision === 'barrio' ? 17 : ubicacion.precision === 'localidad' ? 15 : 13);
+      onChange({ lat, lng }, [barrio, localidad, municipio].filter(Boolean).join(', '));
+    }
 
-    // Debounce geocoding requests to prevent slamming Nominatim API on inputs
-    const timer = setTimeout(() => {
-      triggerGeocoding();
-    }, 1500);
-
-    return () => clearTimeout(timer);
+    setGeoNotice(
+      barrio && ubicacion.precision !== 'barrio'
+        ? 'No tenemos el punto exacto de este barrio; te ubicamos en su zona. Mueve el pin al lugar de entrega.'
+        : null
+    );
   }, [leafletLoaded, municipio, localidad, barrio]);
 
   return (
@@ -325,18 +301,10 @@ export default function MapPicker({
           }}
         />
 
-        {/* Loading Overlay */}
-        {loadingGeocoding && (
-          <div className="absolute top-2 right-2 bg-white/95 backdrop-blur-xs px-3 py-1.5 rounded-full shadow-md text-[10px] font-bold text-sage-primary border border-slate-100 flex items-center gap-1.5 animate-pulse z-[1000]">
-            <span className="w-1.5 h-1.5 rounded-full bg-sage-primary animate-ping" />
-            Buscando Barrio...
-          </div>
-        )}
-
-        {/* Error Notification */}
-        {geoError && !loadingGeocoding && (
+        {/* Aviso: barrio sin punto exacto */}
+        {geoNotice && !isExpanded && (
           <div className="absolute bottom-2 left-2 right-2 bg-amber-500/95 text-white p-2 rounded-xl shadow-md text-[10px] leading-relaxed z-[1000] border border-amber-600">
-            ⚠️ {geoError}
+            ⚠️ {geoNotice}
           </div>
         )}
       </div>
