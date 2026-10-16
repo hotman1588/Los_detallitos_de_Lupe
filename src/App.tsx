@@ -11,6 +11,7 @@ import ProductCarousel from './components/ProductCarousel';
 import CheckoutFlow from './components/CheckoutFlow';
 import AdminPanel from './components/AdminPanel';
 import OrderTracker from './components/OrderTracker';
+import CartSideTab from './components/CartSideTab';
 import { getProductDiscount, getProductEffectivePrice } from './lib/promoUtils';
 import { ShoppingCart, Search, Eye, ShoppingBag, ListFilter, CheckCircle, Heart, Truck, Gift, MessageCircle, Flower2, Crown } from 'lucide-react';
 import {
@@ -50,6 +51,16 @@ export default function App() {
   
   // Added Product Success Popup State
   const [addedProduct, setAddedProduct] = useState<Product | null>(null);
+  // Cambia en cada "agregar" para reiniciar el temporizador aunque sea el mismo producto.
+  const [addedTick, setAddedTick] = useState(0);
+  const ADDED_POPUP_MS = 3000;
+
+  // La confirmación de "producto agregado" se cierra sola a los 3 segundos.
+  useEffect(() => {
+    if (!addedProduct) return;
+    const timer = window.setTimeout(() => setAddedProduct(null), ADDED_POPUP_MS);
+    return () => window.clearTimeout(timer);
+  }, [addedTick]);
 
   // Exit-intent overlay trigger state
   const [showExitIntent, setShowExitIntent] = useState(false);
@@ -175,6 +186,7 @@ export default function App() {
       updateCartState([...cart, { product, quantity: 1 }]);
     }
     setAddedProduct(product);
+    setAddedTick(t => t + 1);
   };
 
   const handleUpdateCartQty = (productId: string, quantity: number) => {
@@ -707,8 +719,23 @@ ${error || 'Error desconocido.'}`);
 
       {/* ADD-TO-CART PRODUCT CONFIRMATION MODAL */}
       {addedProduct && (
-        <div id="added-product-modal" className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-md w-full border border-slate-100 p-6 space-y-6">
+        <div
+          id="added-product-modal"
+          className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 backdrop-blur-xs animate-fadeIn"
+          onClick={() => setAddedProduct(null)}
+        >
+          <div
+            className="relative bg-white rounded-3xl overflow-hidden shadow-2xl max-w-md w-full border border-slate-100 p-6 space-y-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Barra que se vacía mientras corre el temporizador de cierre */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-slate-100">
+              <div
+                key={addedTick}
+                className="h-full bg-gradient-to-r from-sage-primary to-terracotta animate-shrinkBar"
+                style={{ animationDuration: `${ADDED_POPUP_MS}ms` }}
+              />
+            </div>
             <div className="text-center space-y-2">
               <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-3xl shadow-sm border border-emerald-100">
                 🎉
@@ -761,6 +788,16 @@ ${error || 'Error desconocido.'}`);
             </div>
           </div>
         </div>
+      )}
+
+      {/* PESTAÑA LATERAL DE LA BANDEJA (se despliega solo cuando el cliente la toca) */}
+      {view !== 'checkout' && view !== 'admin' && (
+        <CartSideTab
+          cart={cart}
+          categoryDiscounts={categoryDiscounts}
+          highlight={!!addedProduct}
+          onCheckout={() => setView('checkout')}
+        />
       )}
 
       {/* EXIT-INTENT RECORDATORIO DE COMPRA MODAL */}

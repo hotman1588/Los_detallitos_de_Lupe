@@ -60,6 +60,12 @@ body {
 .animate-kenBurns { animation: kenBurns 18s ease-out infinite alternate; }
 .animate-floaty   { animation: floaty 4s ease-in-out infinite; }
 
+@keyframes shrinkBar {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+.animate-shrinkBar { animation: shrinkBar linear both; }
+
 /* Accesibilidad: respeta a quien prefiere menos movimiento */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
