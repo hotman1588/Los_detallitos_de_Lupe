@@ -62,6 +62,24 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [addedTick]);
 
+  // Barra negra de la bandeja: aparece 3 segundos al cerrarse la confirmación
+  // (antes quedaría tapada por ella) y luego se oculta; la pestaña lateral queda disponible.
+  const [showCartBanner, setShowCartBanner] = useState(false);
+  const [cartBannerTick, setCartBannerTick] = useState(0);
+  const prevAddedRef = React.useRef<Product | null>(null);
+  useEffect(() => {
+    if (prevAddedRef.current && !addedProduct) {
+      setShowCartBanner(true);
+      setCartBannerTick(t => t + 1);
+    }
+    prevAddedRef.current = addedProduct;
+  }, [addedProduct]);
+  useEffect(() => {
+    if (!showCartBanner) return;
+    const timer = window.setTimeout(() => setShowCartBanner(false), ADDED_POPUP_MS);
+    return () => window.clearTimeout(timer);
+  }, [cartBannerTick]);
+
   // Exit-intent overlay trigger state
   const [showExitIntent, setShowExitIntent] = useState(false);
 
@@ -797,6 +815,8 @@ ${error || 'Error desconocido.'}`);
           categoryDiscounts={categoryDiscounts}
           highlight={!!addedProduct}
           onCheckout={() => setView('checkout')}
+          onRemoveItem={handleRemoveFromCart}
+          onClearCart={handleClearCart}
         />
       )}
 
@@ -872,8 +892,16 @@ ${error || 'Error desconocido.'}`);
       )}
 
       {/* PERSISTENT FLOATING PROFESSIONAL CART TRACKER BANNER */}
-      {cartCount > 0 && view !== 'checkout' && view !== 'admin' && (
-        <div id="floating-cart-tracker" className="fixed bottom-24 right-6 left-6 md:left-auto md:right-6 md:bottom-24 z-40 bg-slate-900 border border-slate-800 text-white shadow-2xl rounded-3xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 animate-fadeIn max-w-sm md:w-[380px]">
+      {showCartBanner && cartCount > 0 && view !== 'checkout' && view !== 'admin' && (
+        <div id="floating-cart-tracker" className="fixed bottom-24 right-6 left-6 md:left-auto md:right-6 md:bottom-24 z-40 bg-slate-900 border border-slate-800 text-white shadow-2xl rounded-3xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 animate-fadeIn max-w-sm md:w-[380px] overflow-hidden">
+          {/* Barra que se vacía mientras corre el temporizador de cierre */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-slate-800">
+            <div
+              key={cartBannerTick}
+              className="h-full bg-gradient-to-r from-emerald-400 to-terracotta animate-shrinkBar"
+              style={{ animationDuration: `${ADDED_POPUP_MS}ms` }}
+            />
+          </div>
           <div className="flex items-center gap-3">
             <div className="relative w-10 h-10 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center justify-center text-emerald-400 shrink-0">
               <ShoppingCart size={18} />
@@ -896,7 +924,7 @@ ${error || 'Error desconocido.'}`);
 
           <div className="flex items-center gap-2 w-full md:w-auto">
             <button
-              onClick={() => setView('checkout')}
+              onClick={() => { setShowCartBanner(false); setView('checkout'); }}
               className="flex-grow md:flex-grow-0 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl flex items-center justify-center gap-1 transition-all duration-150 cursor-pointer shadow-sm shadow-rose-900/10"
             >
               <span>💳 Pagar Ahora</span>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShoppingCart, ChevronRight, X } from 'lucide-react';
+import { ShoppingCart, ChevronRight, X, Trash2 } from 'lucide-react';
 import { CartItem } from '../types';
 import { getProductEffectivePrice } from '../lib/promoUtils';
 
@@ -8,11 +8,13 @@ interface CartSideTabProps {
   categoryDiscounts: Record<string, number>;
   highlight: boolean; // resalta la pestaña justo después de agregar un producto
   onCheckout: () => void;
+  onRemoveItem: (productId: string) => void;
+  onClearCart: () => void;
 }
 
 // Pestaña fija en el borde derecho: muestra la bandeja de pedido y se
 // despliega solo cuando el cliente la toca, sin tapar la pantalla.
-export default function CartSideTab({ cart, categoryDiscounts, highlight, onCheckout }: CartSideTabProps) {
+export default function CartSideTab({ cart, categoryDiscounts, highlight, onCheckout, onRemoveItem, onClearCart }: CartSideTabProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const count = cart.reduce((acc, item) => acc + item.quantity, 0);
@@ -76,6 +78,15 @@ export default function CartSideTab({ cart, categoryDiscounts, highlight, onChec
                       {item.quantity} × ${getProductEffectivePrice(item.product, categoryDiscounts).toLocaleString('es-CO')}
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => onRemoveItem(item.product.id)}
+                    aria-label={`Eliminar ${item.product.name} de la bandeja`}
+                    title="Eliminar de la bandeja"
+                    className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer shrink-0"
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </li>
               ))}
             </ul>
@@ -95,6 +106,19 @@ export default function CartSideTab({ cart, categoryDiscounts, highlight, onChec
               >
                 💳 Ir a Pagar
                 <ChevronRight size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm('¿Estás seguro de que deseas vaciar tu bandeja de pedido?')) {
+                    onClearCart();
+                    setIsOpen(false);
+                  }
+                }}
+                className="w-full text-slate-500 hover:text-rose-600 hover:bg-rose-50 font-bold text-[11px] py-2 rounded-full flex items-center justify-center gap-1.5 transition cursor-pointer"
+              >
+                <Trash2 size={13} />
+                Vaciar bandeja
               </button>
             </div>
           </aside>
