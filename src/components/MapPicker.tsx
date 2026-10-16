@@ -143,8 +143,9 @@ export default function MapPicker({
       }).setView([initialCenter.lat, initialCenter.lng], 15);
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
+        attribution: '&copy; OpenStreetMap'
       }).addTo(map);
+      map.attributionControl.setPrefix(false);
 
       // Create draggable marker
       const marker = L.marker([initialCenter.lat, initialCenter.lng], {
@@ -344,10 +345,10 @@ export default function MapPicker({
         <div className="bg-slate-50 border border-slate-150 p-2.5 rounded-xl text-[10px] text-slate-500 flex items-start gap-1.5 leading-relaxed">
           <span className="text-xs select-none">💡</span>
           <p>
-            Al seleccionar tu Municipio, Localidad y Barrio, **el mapa se aproximará de forma automática**. Puedes arrastrar el marcador rojo o hacer clic directamente en la calle exacta para orientar mejor al domiciliario de Los Detallitos de Lupe.
+            Al seleccionar tu Municipio, Localidad y Barrio, <strong>el mapa se aproximará de forma automática</strong>. Puedes arrastrar el marcador rojo o hacer clic directamente en la calle exacta para orientar mejor al domiciliario de Los Detallitos de Lupe.
             {value && (
               <span className="block font-mono text-emerald-850 font-bold mt-1">
-                📍 Pinned: Lat: {value.lat.toFixed(5)}, Lng: {value.lng.toFixed(5)}
+                📍 Ubicación de entrega marcada ✓
               </span>
             )}
           </p>

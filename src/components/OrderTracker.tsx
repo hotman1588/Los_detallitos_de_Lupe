@@ -248,8 +248,8 @@ export default function OrderTracker() {
               <Sparkles size={20} className="text-terracotta animate-pulse absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
             </div>
             <div className="space-y-1">
-              <h4 className="font-bold text-slate-700">Validando en Servidor Central</h4>
-              <p className="text-xs text-slate-400">Filtrando guías logísticas del portal...</p>
+              <h4 className="font-bold text-slate-700">Buscando tu pedido</h4>
+              <p className="text-xs text-slate-400">Un momento, por favor...</p>
             </div>
           </motion.div>
         )}
@@ -302,7 +302,7 @@ export default function OrderTracker() {
                 <p>Fecha Compra: <strong className="text-white font-bold">{new Date(foundOrder.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })}</strong></p>
                 <div className="flex items-center gap-1.5 pt-1">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
-                  <p className="text-[11px] text-slate-400 uppercase tracking-widest font-black">Servidor Activo</p>
+                  <p className="text-[11px] text-slate-400 uppercase tracking-widest font-black">Seguimiento en línea</p>
                 </div>
               </div>
             </div>

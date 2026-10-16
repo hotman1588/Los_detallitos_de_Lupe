@@ -292,8 +292,6 @@ export default function AdminPanel({
 
   // Supabase Export Control States
   const [showSupabaseModal, setShowSupabaseModal] = useState(false);
-  const [supabaseTab, setSupabaseTab] = useState<'sql_schema' | 'sql_inserts' | 'csv'>('sql_schema');
-  const [sqlCopySuccess, setSqlCopySuccess] = useState(false);
 
   // Custom dialog states for deleting orders and products
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
@@ -445,59 +443,13 @@ export default function AdminPanel({
     }, 4000);
   };
 
-  // Helper SQL schema generator for Supabase
-  const getSupabaseSqlSchema = () => {
-    return `-- =======================================================
--- El esquema y las reglas de seguridad de la base de datos se
--- administran con las migraciones del repositorio:
---   supabase/migrations/
--- Aplicar con:  supabase db push --linked
---
--- No crees políticas que permitan escribir a usuarios anónimos:
--- toda modificación pasa por funciones que validan la sesión.
--- =======================================================
-`;
-  };
-
-  // Help generate real insertion strings based on the current orders
-  const generateSupabaseSqlInserts = () => {
-    let sql = `-- =======================================================\n`;
-    sql += `-- INSERTS DE DATOS DINÁMICOS RELATIVOS A LA SESIÓN ACTUAL\n`;
-    sql += `-- Ejecutar en Supabase para insertar instantáneamente las órdenes e inventario\n`;
-    sql += `-- =======================================================\n\n`;
-
-    sql += `-- --- INSERCIÓN EN TABLA DE "pedidos" ---\n`;
-    if (orders.length === 0) {
-      sql += `-- No hay órdenes activas aún. Por favor realice una orden de compra para generar el script SQL.\n`;
-    } else {
-      orders.forEach(order => {
-        const s = order.shipping;
-        const esc = (str: string) => (str || '').replace(/'/g, "''");
-        const sub = order.subtotal || order.items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-        const fee = typeof order.shippingFee === 'number' ? order.shippingFee : Math.max(0, order.total - sub);
-        sql += `INSERT INTO pedidos (id, comprador_nombre, comprador_cedula, comprador_telefono, destinatario_nombre, destinatario_telefono, municipio, localidad, barrio, direccion_detallada, mensaje_tarjeta, subtotal, valor_domicilio, total, estado, metodo_pago, fecha_creacion) VALUES ('${esc(order.id)}', '${esc(s.buyerName)}', '${esc(s.buyerCedula)}', '${esc(s.buyerPhone)}', '${esc(s.recipientName)}', '${esc(s.recipientPhone)}', '${esc(s.municipio)}', '${esc(s.localidad)}', '${esc(s.barrio)}', '${esc(s.direccionDetallada)}', '${esc(s.mensajeTarjeta)}', ${sub}, ${fee}, ${order.total}, '${esc(order.status)}', '${esc(order.paymentMethod || 'Transferencia Directa')}', '${order.createdAt || new Date().toISOString()}');\n`;
-      });
-    }
-
-    sql += `\n-- --- INSERCIÓN EN TABLA DE "catalogo_productos" ---\n`;
-    if (products.length === 0) {
-      sql += `-- No hay productos cargados en el inventario actual.\n`;
-    } else {
-      products.forEach(p => {
-        const esc = (str: string) => (str || '').replace(/'/g, "''");
-        sql += `INSERT INTO catalogo_productos (id, name, price, category, image, description, featured) VALUES ('${esc(p.id)}', '${esc(p.name)}', ${p.price}, '${esc(p.category)}', '${esc(p.image)}', '${esc(p.description)}', ${p.featured ? 'true' : 'false'});\n`;
-      });
-    }
-    return sql;
-  };
-
   // CSV Generator + immediate browser downloader
-  const downloadCsvForSupabase = (type: 'orders' | 'inventory') => {
+  const downloadCsv = (type: 'orders' | 'inventory') => {
     let csvContent = "";
     let filename = "";
 
     if (type === 'orders') {
-      filename = `dulce_amanecer_ordenes_supabase.csv`;
+      filename = `ordenes_los_detallitos.csv`;
       // Byte order mark (BOM) to correctly display spanish accents in Excel
       csvContent += "id,comprador_nombre,comprador_cedula,comprador_telefono,destinatario_nombre,destinatario_telefono,municipio,localidad,barrio,direccion_detallada,mensaje_tarjeta,subtotal,valor_domicilio,total,estado,metodo_pago,fecha_creacion\n";
 
@@ -529,7 +481,7 @@ export default function AdminPanel({
         csvContent += row.join(",") + "\n";
       });
     } else {
-      filename = `dulce_amanecer_inventario_supabase.csv`;
+      filename = `catalogo_los_detallitos.csv`;
       csvContent += "id,name,price,category,image,description,featured\n";
 
       products.forEach(p => {
@@ -837,8 +789,8 @@ export default function AdminPanel({
           }`}>
             <span className={`w-2 h-2 rounded-full ${isSupabaseConfigured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
             {isSupabaseConfigured
-              ? 'En línea · usuarios centralizados (Supabase)'
-              : 'Modo local · este dispositivo no está conectado a Supabase'}
+              ? 'En línea'
+              : 'Sin conexión con el servidor'}
           </div>
         </form>
       </div>
@@ -1743,7 +1695,7 @@ export default function AdminPanel({
             <div className="flex items-center gap-1.5 mt-2">
               <span className={`w-2.5 h-2.5 rounded-full ${isSupabaseConfigured ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
               <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">
-                {isSupabaseConfigured ? '🟢 Conectado a Supabase' : '🟡 Modo Local (LocalStorage)'}
+                {isSupabaseConfigured ? '🟢 En línea' : '🟡 Sin conexión'}
               </span>
             </div>
           </div>
@@ -1756,7 +1708,7 @@ export default function AdminPanel({
             className="bg-sky-700 hover:bg-sky-800 text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-2 transition cursor-pointer text-white shadow-xs"
           >
             <Database size={14} />
-            Exportador Supabase
+            Exportar Datos
           </button>
           <button
             onClick={() => {
@@ -3273,20 +3225,18 @@ export default function AdminPanel({
         </div>
       )}
 
-      {/* SUPABASE EXPORT MODAL */}
+      {/* EXPORTAR DATOS (solo administrador) */}
       {showSupabaseModal && canUseInternalTools && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans">
-          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-slate-100 animate-scaleUp text-slate-800">
-            
-            {/* Header */}
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-slate-100 animate-scaleUp text-slate-800">
             <div className="bg-sky-900 text-white p-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-sky-800 rounded-2xl text-sky-200">
                   <Database size={24} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold">Consola de Exportación a Supabase / PostgreSQL</h3>
-                  <p className="text-xs text-sky-200">Migra y sincroniza fácilmente tu base de datos y pedidos en la nube.</p>
+                  <h3 className="text-lg font-bold">Exportar Datos</h3>
+                  <p className="text-xs text-sky-200">Descarga tus órdenes y catálogo en archivos que se abren con Excel.</p>
                 </div>
               </div>
               <button
@@ -3297,141 +3247,35 @@ export default function AdminPanel({
               </button>
             </div>
 
-            {/* Step Guides / Instructions */}
-            <div className="bg-sky-50 border-b border-sky-100 px-6 py-4">
-              <span className="text-[10px] font-bold text-sky-800 uppercase tracking-wider block mb-1">Guía Rápida de Integración</span>
-              <ol className="text-xs text-sky-900 space-y-1 list-decimal list-inside font-medium">
-                <li>Crea un proyecto gratis en <a href="https://supabase.com" target="_blank" rel="noreferrer" className="underline font-bold hover:text-sky-950">Supabase.com</a>.</li>
-                <li>Ve a la pestaña <strong>SQL Editor</strong> en Supabase, pega el <strong>Script de Creación (DDL)</strong> y ejecútalo.</li>
-                <li>Pega el <strong>Script de Inserción</strong> para cargar las órdenes actuales o descarga los archivos <strong>CSV</strong> a tu PC.</li>
-              </ol>
-            </div>
-
-            {/* Navigation Tabs bar inside modal */}
-            <div className="flex border-b border-slate-200 bg-slate-50 px-6 font-semibold text-xs py-1">
-              <button
-                onClick={() => setSupabaseTab('sql_schema')}
-                className={`py-3 px-4 border-b-2 transition cursor-pointer ${
-                  supabaseTab === 'sql_schema'
-                    ? 'border-sky-700 text-sky-800 font-bold'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                📁 1. Estructura de Tablas (SQL DDL)
-              </button>
-              <button
-                onClick={() => setSupabaseTab('sql_inserts')}
-                className={`py-3 px-4 border-b-2 transition cursor-pointer ${
-                  supabaseTab === 'sql_inserts'
-                    ? 'border-sky-700 text-sky-800 font-bold'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                ⚡ 2. Script de Datos Dinámicos (SQL DML)
-              </button>
-              <button
-                onClick={() => setSupabaseTab('csv')}
-                className={`py-3 px-4 border-b-2 transition cursor-pointer ${
-                  supabaseTab === 'csv'
-                    ? 'border-sky-700 text-sky-800 font-bold'
-                    : 'border-transparent text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                💾 3. Descarga CSV
-              </button>
-            </div>
-
-            {/* Context/View panels */}
-            <div className="flex-1 p-6 overflow-y-auto space-y-4">
-              {supabaseTab === 'sql_schema' && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-600 block">Código SQL para crear tablas en Supabase:</span>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(getSupabaseSqlSchema());
-                        setSqlCopySuccess(true);
-                        setTimeout(() => setSqlCopySuccess(false), 2500);
-                      }}
-                      className="bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold text-xs px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
-                    >
-                      {sqlCopySuccess ? '✓ ¡Copiado!' : '📋 Copiar Código SQL'}
-                    </button>
+            <div className="flex-1 p-6 overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="border border-slate-150 p-5 rounded-2xl hover:border-sky-500 transition-colors bg-slate-50/50 flex flex-col justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800">Órdenes de Venta ({orders.length})</h4>
+                    <p className="text-xs text-slate-500 mt-1">Comprador, destinatario, dirección, valores, estado y fecha de cada orden.</p>
                   </div>
-                  <pre className="bg-slate-900 text-slate-200 text-xs p-4 rounded-xl font-mono overflow-x-auto max-h-[280px] border border-slate-800 select-all leading-relaxed shadow-inner">
-                    {getSupabaseSqlSchema()}
-                  </pre>
+                  <button
+                    onClick={() => downloadCsv('orders')}
+                    className="mt-4 bg-sky-700 hover:bg-sky-800 text-white font-bold text-xs py-2 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 w-full shadow-xs"
+                  >
+                    📥 Descargar órdenes
+                  </button>
                 </div>
-              )}
 
-              {supabaseTab === 'sql_inserts' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-600 block">Script de inserción con órdenes y catálogo actual ({orders.length} pedidos, {products.length} productos):</span>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(generateSupabaseSqlInserts());
-                        setSqlCopySuccess(true);
-                        setTimeout(() => setSqlCopySuccess(false), 2500);
-                      }}
-                      className="bg-sky-100 hover:bg-sky-200 text-sky-800 font-bold text-xs px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition cursor-pointer"
-                    >
-                      {sqlCopySuccess ? '✓ ¡Copiado!' : '📋 Copiar Código SQL'}
-                    </button>
+                <div className="border border-slate-150 p-5 rounded-2xl hover:border-sky-500 transition-colors bg-slate-50/50 flex flex-col justify-between">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800">Catálogo de Productos ({products.length})</h4>
+                    <p className="text-xs text-slate-500 mt-1">Nombre, precio, categoría, descripción y destacado de cada producto.</p>
                   </div>
-                  <pre className="bg-slate-900 text-slate-200 text-[11px] p-4 rounded-xl font-mono overflow-x-auto max-h-[280px] border border-slate-800 select-all leading-relaxed shadow-inner">
-                    {generateSupabaseSqlInserts()}
-                  </pre>
+                  <button
+                    onClick={() => downloadCsv('inventory')}
+                    className="mt-4 bg-sky-700 hover:bg-sky-800 text-white font-bold text-xs py-2 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 w-full shadow-xs"
+                  >
+                    📥 Descargar catálogo
+                  </button>
                 </div>
-              )}
-
-              {supabaseTab === 'csv' && (
-                <div className="space-y-6">
-                  <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-2xl text-yellow-900 text-xs font-medium">
-                    💡 <strong>Consejo Supabase:</strong> Si no deseas usar comandos SQL, puedes descargar estos archivos CSV y subirlos arrastrándolos directamente a la interfaz web de Supabase en "Table Editor" -&gt; "New Table" -&gt; "Import data via CSV".
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="border border-slate-150 p-5 rounded-2xl hover:border-sky-500 transition-colors bg-slate-50/50 flex flex-col justify-between">
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-805">Órdenes de Venta ({orders.length})</h4>
-                        <p className="text-xs text-slate-500 mt-1">Archivo CSV formateado para la tabla pedidos.</p>
-                      </div>
-                      <button
-                        onClick={() => downloadCsvForSupabase('orders')}
-                        className="mt-4 bg-sky-700 hover:bg-sky-800 text-white font-bold text-xs py-2 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 w-full shadow-xs"
-                      >
-                        📥 Descargar órdenes.csv
-                      </button>
-                    </div>
-
-                    <div className="border border-slate-150 p-5 rounded-2xl hover:border-sky-500 transition-colors bg-slate-50/50 flex flex-col justify-between">
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-805 font-semibold">Catálogo de Productos ({products.length})</h4>
-                        <p className="text-xs text-slate-500 mt-1">Archivo CSV formateado para la tabla catalogo_productos.</p>
-                      </div>
-                      <button
-                        onClick={() => downloadCsvForSupabase('inventory')}
-                        className="mt-4 bg-sky-700 hover:bg-sky-800 text-white font-bold text-xs py-2 px-4 rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 w-full shadow-xs"
-                      >
-                        📥 Descargar catálogo.csv
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
-
-            {/* Footer buttons of the modal */}
-            <div className="bg-slate-50 px-6 py-4 flex justify-end gap-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setShowSupabaseModal(false)}
-                className="bg-slate-200 hover:bg-slate-300 text-slate-800 px-5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer"
-              >
-                Cerrar Exportador
-              </button>
-            </div>
-
           </div>
         </div>
       )}

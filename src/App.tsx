@@ -964,7 +964,7 @@ ${error || 'Error desconocido.'}`);
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-4">
           <p className="font-bold text-slate-300">🌸 Los Detallitos de Lupe • Desayunos, Detalles y Floristería S.A.S</p>
           <p className="max-w-lg mx-auto leading-relaxed text-slate-500 text-[11px]">
-            Operando bajo lineamientos logísticos estrictos de 3 días de anticipación y DIVIPOLA DANE oficial para entregas sin contratiempos en las comunas de Soacha y localidades de Bogotá D.C., Colombia.
+            Pedidos con 3 días de anticipación para entregas sin contratiempos en las comunas de Soacha y localidades de Bogotá D.C., Colombia.
           </p>
           <p className="text-[10px] text-slate-600">&copy; {new Date().getFullYear()} Los Detallitos de Lupe. Todos los derechos reservados.</p>
         </div>
