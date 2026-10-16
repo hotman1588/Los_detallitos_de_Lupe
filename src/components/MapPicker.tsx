@@ -312,8 +312,16 @@ export default function MapPicker({
         {/* Actual Map Container */}
         <div 
           ref={mapContainerRef} 
-          className={isExpanded ? 'w-full flex-1 min-h-0' : 'w-full h-full'}
-          style={{ visibility: leafletLoaded ? 'visible' : 'hidden', position: leafletLoaded ? 'relative' : 'absolute' }}
+          // La clase no debe cambiar: Leaflet agrega las suyas a este div y React las borraría.
+          // El tamaño al ampliar se ajusta por estilo.
+          className="w-full"
+          style={{
+            visibility: leafletLoaded ? 'visible' : 'hidden',
+            position: leafletLoaded ? 'relative' : 'absolute',
+            height: isExpanded ? 'auto' : '100%',
+            flex: isExpanded ? '1 1 0%' : undefined,
+            minHeight: 0
+          }}
         />
 
         {/* Loading Overlay */}
