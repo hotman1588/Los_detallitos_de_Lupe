@@ -72,6 +72,8 @@ export default function AdminPanel({
   const canDeleteOrders = userRole === 'admin';
   const canSimulateOrders = userRole === 'admin';
   const canAssignAdminRole = userRole === 'admin';
+  // Exportador Supabase y configuración del ID de venta: solo administrador.
+  const canUseInternalTools = userRole === 'admin';
   const getRoleLabel = (role: SystemUser['role']) => {
     if (role === 'admin') return '🚨 Administrador';
     if (role === 'supervisor') return '🛡️ Supervisor';
@@ -267,10 +269,10 @@ export default function AdminPanel({
       setAdminIdPrefix(prefix);
       setAdminIdCounter(String(counter));
     }
-    if (isLoggedIn && canUseAdminDashboard) {
+    if (isLoggedIn && canUseInternalTools) {
       loadConfig();
     }
-  }, [isLoggedIn, canUseAdminDashboard]);
+  }, [isLoggedIn, canUseInternalTools]);
 
   const [showIdConfigMsg, setShowIdConfigMsg] = useState(false);
   const [showIdConfigPanel, setShowIdConfigPanel] = useState(false);
@@ -1747,6 +1749,8 @@ export default function AdminPanel({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {canUseInternalTools && (
+          <>
           <button
             onClick={() => setShowSupabaseModal(true)}
             className="bg-sky-700 hover:bg-sky-800 text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-2 transition cursor-pointer text-white shadow-xs"
@@ -1773,6 +1777,8 @@ export default function AdminPanel({
             <SlidersHorizontal size={14} />
             Configurar ID de Venta
           </button>
+          </>
+          )}
           {canDeleteOrders && (
           <button
             onClick={() => {
@@ -1896,7 +1902,8 @@ export default function AdminPanel({
       {/* TAB 1: ORDERS SECTION */}
       {activeTab === 'orders' && (
         <div id="admin-orders-tab" className="space-y-6">
-          {/* Automated ID Generation Config Card */}
+          {/* Automated ID Generation Config Card (solo administrador) */}
+          {canUseInternalTools && (
           <div id="automated-id-config-card" className="bg-white rounded-3xl border-2 border-olive-dark/20 p-6 shadow-xs animate-fadeIn space-y-4 font-sans transition-all duration-300">
             <div className="flex items-start justify-between">
               <div>
@@ -1953,6 +1960,7 @@ export default function AdminPanel({
               )}
             </div>
           </div>
+          )}
 
           {/* Controls Bar for Searching and switching layout */}
           <div id="admin-orders-filters" className="bg-white rounded-3xl border border-slate-100 p-4 sm:p-5 shadow-xs space-y-4 font-sans scroll-mt-24">
@@ -3266,7 +3274,7 @@ export default function AdminPanel({
       )}
 
       {/* SUPABASE EXPORT MODAL */}
-      {showSupabaseModal && (
+      {showSupabaseModal && canUseInternalTools && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs font-sans">
           <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-slate-100 animate-scaleUp text-slate-800">
             
